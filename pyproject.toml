@@ -1,2 +1,29 @@
+[project]
+name = "autonomous-engine"
+version = "0.1.0"
+description = "Autonomous AI Engine that finds UI bugs using headless browsing and automatically fixes them in codebases."
+requires-python = ">=3.11"
+dependencies = [
+    "langchain-openai>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-core>=0.3.0",
+    "browser-use>=0.1.40",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "requests>=2.32.0",
+    "httpx>=0.27.0",
+    "PyGithub>=2.3.0",
+    "anyio>=4.4.0",
+    "tenacity>=8.3.0",
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.0",
+    "python-multipart>=0.0.9",
+    "apscheduler>=3.10.0",
+    "rich>=13.7.0",
+    "structlog>=24.2.0",
+    "playwright>=1.44.0",
+]
+
 [tool.vercel]
 entrypoint = "server:app"
