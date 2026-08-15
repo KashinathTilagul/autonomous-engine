@@ -2,7 +2,7 @@
 main.py
 ───────
 Autonomous UI Bug-Finding & Fix Engine — Core Orchestrator.
-Maintains full pipeline transparency with step-by-step progress tracking.
+Maintains clear boundaries between QA Inspection, AI Code Repair, and GitHub PR publishing.
 """
 
 from __future__ import annotations
@@ -43,6 +43,9 @@ async def run_pipeline_for_url(
     verify: bool,
     publish_pr: bool,
 ) -> dict:
+    cfg = get_settings()
+    has_github_repo = bool(cfg.github_token and cfg.repo_name and cfg.github_token.get_secret_value())
+
     result: dict = {
         "url": url,
         "bug_found": False,
@@ -73,36 +76,41 @@ async def run_pipeline_for_url(
     result["bug_found"] = True
     console.print(
         Panel(
-            f"[red]⚠ Bug detected![/red]\n"
+            f"[red]⚠ Defect detected![/red]\n"
             f"Severity : {bug_report['severity']}\n"
             f"Summary  : {bug_report['summary']}",
             expand=False,
         )
     )
 
-    # ── Step 2: Code Repair ──────────────────────────────────────────────────
-    console.rule("[bold yellow]🔧  Step 2: AI Code Repair")
-    coder = CodeRepairAgent()
-    repair_result = coder.trigger_fix(bug_report, repo_path)
+    # ── Step 2: Code Repair (Only if repo / fix is explicitly targeted) ─────────
+    # If no GitHub token / repo path is configured, do not claim fix is done
+    if repo_path and repo_path != "." or has_github_repo:
+        console.rule("[bold yellow]🔧  Step 2: AI Code Repair")
+        coder = CodeRepairAgent()
+        repair_result = coder.trigger_fix(bug_report, repo_path)
 
-    if not repair_result.get("success"):
-        error_msg = repair_result.get("error", "Code repair step failed")
-        result["error"] = error_msg
-        return result
-
-    result["fixed"] = True
-    result["repair_details"] = repair_result.get("details", {})
-    console.print(Panel("[green]✓ AI Code Repair solution planned[/green]", expand=False))
+        if repair_result.get("success"):
+            result["fixed"] = True
+            result["repair_details"] = repair_result.get("details", {})
+            console.print(Panel("[green]✓ AI Code Repair patch prepared[/green]", expand=False))
+        else:
+            result["fixed"] = False
+            result["error"] = repair_result.get("error", "Code repair skipped")
+    else:
+        result["fixed"] = False
+        result["repair_details"] = None
+        console.print("[dim]No GitHub repository connected for automated commit. Skipping code modification.[/dim]")
 
     # ── Step 3: Verification ─────────────────────────────────────────────────
-    if verify:
+    if verify and result.get("fixed"):
         console.rule("[bold blue]🔍  Step 3: Post-Fix Verification")
         verification_report = await qa_agent.run_test_flow(url, scenario)
         still_broken = verification_report.get("has_bug", False)
         result["verified"] = not still_broken
 
-    # ── Step 4: Publish PR ───────────────────────────────────────────────────
-    if publish_pr and result.get("fixed"):
+    # ── Step 4: Publish PR (Requires GitHub Token) ───────────────────────────
+    if publish_pr and result.get("fixed") and has_github_repo:
         console.rule("[bold magenta]📬  Step 4: Publishing Pull Request")
         try:
             branch_name = f"fix/auto-{_slugify(bug_report.get('summary', url))}"
@@ -118,5 +126,7 @@ async def run_pipeline_for_url(
             result["pr_url"] = pr_url
         except Exception as exc:
             result["error"] = f"PR creation failed: {exc}"
+    elif publish_pr and not has_github_repo:
+        result["error"] = "GitHub Personal Access Token not provided in Settings. PR creation skipped."
 
     return result

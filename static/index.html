@@ -383,17 +383,15 @@
       <div class="next-step-banner" id="nextStepBanner">
         <div class="ns-head">
           <div class="ns-title">
-            <span>⚡ Next Action Recommended:</span>
-            <span id="nextActionName">Generate Code Fix Plan</span>
+            <span>⚡ Next Action:</span>
+            <span id="nextActionName">Inspection Finished</span>
           </div>
-          <span class="ns-timer" id="autoAdvanceTimer">Auto-proceeding in 8s...</span>
         </div>
         <div class="ns-desc" id="nextActionDesc">
-          The audit detected areas of improvement. You can approve proceeding to Step 3 (AI Code Repair) immediately or pause.
+          Review the diagnostic steps below.
         </div>
-        <div class="ns-actions">
-          <button class="btn btn-p btn-sm" onclick="approveNextStep()">✓ Approve & Proceed Now</button>
-          <button class="btn btn-g btn-sm" onclick="pauseNextStep()">⏸ Pause / Wait</button>
+        <div class="ns-actions" id="nextActionButtons">
+          <button class="btn btn-g btn-sm" onclick="closeNextStep()">Dismiss</button>
         </div>
       </div>
 
@@ -502,7 +500,7 @@
    ════════════════════════════════════════════════ */
 let currentUser = null;
 let currentAuthMode = 'signin';
-let sseConn = null, pollTmr = null, advanceTimer = null;
+let sseConn = null, pollTmr = null;
 let currentRunResult = null;
 
 const STORAGE_KEY_SETTINGS = "bugengine_settings_v4";
@@ -672,40 +670,15 @@ function updateTimeline(step) {
   }
 }
 
-function showNextStepPrompt(title, desc, nextActionFn) {
+function showNextStepPrompt(title, desc) {
   const banner = document.getElementById('nextStepBanner');
   document.getElementById('nextActionName').textContent = title;
   document.getElementById('nextActionDesc').textContent = desc;
   banner.classList.add('show');
-
-  let seconds = 8;
-  const timerEl = document.getElementById('autoAdvanceTimer');
-  timerEl.textContent = `Auto-proceeding in ${seconds}s...`;
-
-  if (advanceTimer) clearInterval(advanceTimer);
-  advanceTimer = setInterval(() => {
-    seconds--;
-    if (seconds > 0) {
-      timerEl.textContent = `Auto-proceeding in ${seconds}s...`;
-    } else {
-      clearInterval(advanceTimer);
-      banner.classList.remove('show');
-      nextActionFn();
-    }
-  }, 1000);
 }
 
-function approveNextStep() {
-  if (advanceTimer) clearInterval(advanceTimer);
+function closeNextStep() {
   document.getElementById('nextStepBanner').classList.remove('show');
-  appendLog("✓ User approved next action. Proceeding...", "ok");
-  updateTimeline(4);
-}
-
-function pauseNextStep() {
-  if (advanceTimer) clearInterval(advanceTimer);
-  document.getElementById('autoAdvanceTimer').textContent = "Paused by user";
-  appendLog("⏸ User paused pipeline auto-advance.", "info");
 }
 
 /* ════════ Inspection Run ════════ */
@@ -758,7 +731,7 @@ function openSSE() {
     if (d.line) {
       appendLog(d.line);
       if (d.line.includes('DOM') || d.line.includes('Inspecting') || d.line.includes('200 OK')) updateTimeline(2);
-      if (d.line.includes('Repair') || d.line.includes('Fix') || d.line.includes('solution planned')) updateTimeline(3);
+      if (d.line.includes('Repair') || d.line.includes('Fix') || d.line.includes('patch prepared')) updateTimeline(3);
       if (d.line.includes('Finished') || d.line.includes('Completed')) updateTimeline(4);
     }
     if (d.done) {
@@ -801,7 +774,19 @@ function onAuditDone(result) {
   bg.className = 'rv ' + (result.bug_found ? 'crd' : 'cgr');
 
   document.getElementById('rv-sv').textContent = (result.severity || 'none').toUpperCase();
-  document.getElementById('rv-fx').textContent = result.fixed ? '✅ Prepared' : '—';
+  
+  // Accurate Fix Status Display:
+  const fx = document.getElementById('rv-fx');
+  if (result.fixed) {
+    fx.textContent = '✅ Patch Prepared';
+    fx.className = 'rv cgr';
+  } else if (result.bug_found) {
+    fx.textContent = '⏸ Connect GitHub Repo';
+    fx.className = 'rv cdm';
+  } else {
+    fx.textContent = '—';
+    fx.className = 'rv cdm';
+  }
   
   const sumEl = document.getElementById('rv-sm');
   sumEl.textContent = result.summary || 'Inspection completed successfully.';
@@ -809,10 +794,10 @@ function onAuditDone(result) {
   // Render Step by Step Breakdown
   const stepContainer = document.getElementById('stepContainer');
   const steps = result.steps_taken && result.steps_taken.length ? result.steps_taken : [
-    "1. Connected to host and validated HTTP response code (200 OK)",
+    "1. Connected to target URL and verified HTTP response headers",
     "2. Extracted page title and parsed interactive DOM elements",
-    "3. Analyzed layout structure, buttons, and form inputs against scenario",
-    "4. Verified absence of broken assets and functional errors"
+    "3. Evaluated form controls and scenario requirements",
+    "4. Completed automated inspection report"
   ];
 
   stepContainer.innerHTML = steps.map((s, idx) => `
@@ -822,18 +807,17 @@ function onAuditDone(result) {
     </div>
   `).join('');
 
-  // Auto-advance prompt to next step with user confirmation / countdown
   if (result.bug_found) {
+    updateTimeline(2);
     showNextStepPrompt(
-      "Review & Apply AI Code Repair",
-      "Defect identified. Ready to generate the localized patch in your connected repository.",
-      () => { updateTimeline(3); appendLog("🔧 Auto-proceeded to Step 3: AI Code Repair", "fix"); }
+      "Defect Detected · Next: Connect GitHub Repository",
+      "An issue was identified. To have the engine generate and commit an automated patch, provide your GitHub Token in the left sidebar."
     );
   } else {
+    updateTimeline(4);
     showNextStepPrompt(
-      "Save Target & Verification",
-      "Page verified healthy. Ready to save this target to your recurring monitoring list.",
-      () => { updateTimeline(4); appendLog("✅ Verification confirmed clean.", "ok"); }
+      "Inspection Passed · Target is Healthy",
+      "No UI or functional defects found on the inspected page. You can save this target to your monitoring list."
     );
   }
 
