@@ -3,47 +3,7 @@ server.py  ·  Autonomous UI Bug Engine
 ─────────────────────────────────────────────────────────────────────────────
 FastAPI web server – Settings, Pipeline, Scheduler, Queue, History,
 Target URL Manager, and Repo Manager with inline file editor.
-Exclusively powered by OpenRouter for all LLM interactions.
-
-Endpoints
-─────────
-  GET  /                            serves index.html
-  GET  /api/settings                masked env values
-  POST /api/settings                write to .env
-
-  POST /api/run                     start pipeline run
-  GET  /api/run/status              last run state
-  GET  /api/run/stream              SSE log stream
-
-  GET  /api/queue                   list queued items
-  POST /api/queue                   add item
-  DELETE /api/queue/{id}            remove item
-  POST /api/queue/run               run all queued items
-
-  GET  /api/schedule                current schedule
-  POST /api/schedule                activate schedule
-  DELETE /api/schedule              disable schedule
-
-  GET  /api/history                 last N runs
-  DELETE /api/history               clear history
-
-  GET  /api/targets                 saved audit URLs
-  POST /api/targets                 add target URL
-  PATCH /api/targets/{id}           update target
-  DELETE /api/targets/{id}          remove target
-
-  GET  /api/repos                   saved repos
-  POST /api/repos                   add repo
-  PATCH /api/repos/{id}             update repo
-  DELETE /api/repos/{id}            remove repo
-  GET  /api/repos/{id}/tree         directory listing (query: path)
-  GET  /api/repos/{id}/file         read file (query: path)
-  POST /api/repos/{id}/file         write file  {path, content}
-  POST /api/repos/{id}/git          git operations {op, message}
-
-Run
-───
-  uvicorn server:app --reload --port 8080
+Optimized for local and serverless (Vercel) environments.
 """
 
 from __future__ import annotations
@@ -54,6 +14,7 @@ import mimetypes
 import os
 import re
 import subprocess
+import tempfile
 import time
 import uuid
 from datetime import datetime, timezone
@@ -61,30 +22,44 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Optional
 
 import uvicorn
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 from dotenv import dotenv_values, set_key
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
-# ── paths ─────────────────────────────────────────────────────────────────────
-BASE_DIR      = Path(__file__).parent
-ENV_FILE      = BASE_DIR / ".env"
+# ── paths (serverless safe /tmp for writable state when on Vercel) ───────────
+BASE_DIR      = Path(__file__).resolve().parent
 STATIC_DIR    = BASE_DIR / "static"
-HISTORY_FILE  = BASE_DIR / ".run_history.json"
-QUEUE_FILE    = BASE_DIR / ".url_queue.json"
-SCHEDULE_FILE = BASE_DIR / ".schedule.json"
-TARGETS_FILE  = BASE_DIR / ".targets.json"
-REPOS_FILE    = BASE_DIR / ".repos.json"
+INDEX_FILE    = STATIC_DIR / "index.html"
+
+# If deployed in read-only serverless environment, use temp directory for writable state
+def _get_writable_dir() -> Path:
+    if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        tmp = Path(tempfile.gettempdir()) / "autonomous_engine"
+        tmp.mkdir(parents=True, exist_ok=True)
+        return tmp
+    return BASE_DIR
+
+STATE_DIR     = _get_writable_dir()
+ENV_FILE      = BASE_DIR / ".env"
+HISTORY_FILE  = STATE_DIR / ".run_history.json"
+QUEUE_FILE    = STATE_DIR / ".url_queue.json"
+SCHEDULE_FILE = STATE_DIR / ".schedule.json"
+TARGETS_FILE  = STATE_DIR / ".targets.json"
+REPOS_FILE    = STATE_DIR / ".repos.json"
+
+# In-memory fallbacks for serverless environments
+_mem_store: dict[str, Any] = {
+    "settings": {},
+    "targets": [],
+    "repos": [],
+    "queue": [],
+    "history": [],
+    "schedule": {"mode": "disabled"}
+}
 
 # ── app ───────────────────────────────────────────────────────────────────────
-app = FastAPI(title="Autonomous UI Bug Engine", version="3.1.0")
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
-scheduler = AsyncIOScheduler()
+app = FastAPI(title="Autonomous UI Bug Engine", version="3.2.0")
 
 _run_state: dict[str, Any] = {
     "status": "idle", "log": [], "result": None, "run_id": None,
@@ -107,27 +82,44 @@ def _mask(key: str, val: str) -> str:
     return val
 
 def _read_env() -> dict[str, str]:
-    return {k: v or "" for k, v in dotenv_values(ENV_FILE).items()} if ENV_FILE.exists() else {}
+    data = {}
+    if ENV_FILE.exists():
+        try:
+            data.update({k: v or "" for k, v in dotenv_values(ENV_FILE).items()})
+        except Exception:
+            pass
+    # Merge with memory store
+    data.update(_mem_store["settings"])
+    return data
 
 def _write_env(updates: dict[str, str]) -> None:
-    ENV_FILE.touch(exist_ok=True)
-    for k, v in updates.items():
-        if v:
-            set_key(str(ENV_FILE), k, v)
+    _mem_store["settings"].update(updates)
+    try:
+        if not os.environ.get("VERCEL"):
+            ENV_FILE.touch(exist_ok=True)
+            for k, v in updates.items():
+                if v:
+                    set_key(str(ENV_FILE), k, v)
+    except Exception:
+        pass
 
-def _load(path: Path, default: Any = None) -> Any:
+def _load(path: Path, mem_key: str, default: Any = None) -> Any:
     try:
         if path.exists():
             return json.loads(path.read_text())
     except Exception:
         pass
-    return default if default is not None else []
+    return _mem_store.get(mem_key, default if default is not None else [])
 
-def _save(path: Path, data: Any) -> None:
-    path.write_text(json.dumps(data, indent=2, default=str))
+def _save(path: Path, mem_key: str, data: Any) -> None:
+    _mem_store[mem_key] = data
+    try:
+        path.write_text(json.dumps(data, indent=2, default=str))
+    except Exception:
+        pass
 
 def _append_history(result: dict) -> None:
-    h = _load(HISTORY_FILE, [])
+    h = _load(HISTORY_FILE, "history", [])
     h.insert(0, {
         "run_id":    result.get("run_id", ""),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -140,7 +132,7 @@ def _append_history(result: dict) -> None:
         "error":     result.get("error"),
         "summary":   result.get("summary", ""),
     })
-    _save(HISTORY_FILE, h[:100])
+    _save(HISTORY_FILE, "history", h[:100])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -148,8 +140,10 @@ def _append_history(result: dict) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
-async def serve_ui() -> FileResponse:
-    return FileResponse(str(STATIC_DIR / "index.html"))
+async def serve_ui() -> HTMLResponse:
+    if INDEX_FILE.exists():
+        return HTMLResponse(content=INDEX_FILE.read_text(encoding="utf-8"))
+    return HTMLResponse("<h2>Autonomous UI Bug Engine is running. Index file not found.</h2>")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -261,23 +255,23 @@ class QueueItem(BaseModel):
 
 @app.get("/api/queue")
 async def get_queue() -> dict:
-    return {"queue": _load(QUEUE_FILE, [])}
+    return {"queue": _load(QUEUE_FILE, "queue", [])}
 
 
 @app.post("/api/queue")
 async def add_to_queue(item: QueueItem) -> dict:
-    q = _load(QUEUE_FILE, [])
+    q = _load(QUEUE_FILE, "queue", [])
     entry = {**item.model_dump(), "id": str(uuid.uuid4())[:8],
              "added_at": datetime.now(timezone.utc).isoformat()}
     q.append(entry)
-    _save(QUEUE_FILE, q)
+    _save(QUEUE_FILE, "queue", q)
     return {"ok": True, "id": entry["id"], "position": len(q)}
 
 
 @app.delete("/api/queue/{item_id}")
 async def remove_from_queue(item_id: str) -> dict:
-    q = [i for i in _load(QUEUE_FILE, []) if i.get("id") != item_id]
-    _save(QUEUE_FILE, q)
+    q = [i for i in _load(QUEUE_FILE, "queue", []) if i.get("id") != item_id]
+    _save(QUEUE_FILE, "queue", q)
     return {"ok": True}
 
 
@@ -285,7 +279,7 @@ async def remove_from_queue(item_id: str) -> dict:
 async def run_queue() -> dict:
     if _run_state["status"] == "running":
         raise HTTPException(409, "A run is already in progress.")
-    q = _load(QUEUE_FILE, [])
+    q = _load(QUEUE_FILE, "queue", [])
     if not q:
         raise HTTPException(400, "Queue is empty.")
     asyncio.create_task(_run_queue_task(q))
@@ -309,24 +303,21 @@ class SchedulePayload(BaseModel):
 
 @app.get("/api/schedule")
 async def get_schedule() -> dict:
-    cfg = _load(SCHEDULE_FILE, {"mode": "disabled"})
-    cfg["next_run"] = _next_run_time()
+    cfg = _load(SCHEDULE_FILE, "schedule", {"mode": "disabled"})
     return cfg
 
 
 @app.post("/api/schedule")
 async def set_schedule(payload: SchedulePayload) -> dict:
-    _save(SCHEDULE_FILE, payload.model_dump())
-    _apply_schedule(payload)
-    return {"ok": True, "mode": payload.mode, "next_run": _next_run_time()}
+    _save(SCHEDULE_FILE, "schedule", payload.model_dump())
+    return {"ok": True, "mode": payload.mode}
 
 
 @app.delete("/api/schedule")
 async def delete_schedule() -> dict:
-    cfg = _load(SCHEDULE_FILE, {})
+    cfg = _load(SCHEDULE_FILE, "schedule", {})
     cfg["mode"] = "disabled"
-    _save(SCHEDULE_FILE, cfg)
-    _remove_job()
+    _save(SCHEDULE_FILE, "schedule", cfg)
     return {"ok": True}
 
 
@@ -336,12 +327,12 @@ async def delete_schedule() -> dict:
 
 @app.get("/api/history")
 async def get_history(limit: int = 50) -> dict:
-    return {"history": _load(HISTORY_FILE, [])[:limit]}
+    return {"history": _load(HISTORY_FILE, "history", [])[:limit]}
 
 
 @app.delete("/api/history")
 async def clear_history() -> dict:
-    _save(HISTORY_FILE, [])
+    _save(HISTORY_FILE, "history", [])
     return {"ok": True}
 
 
@@ -367,35 +358,35 @@ class TargetPatch(BaseModel):
 
 @app.get("/api/targets")
 async def get_targets() -> dict:
-    return {"targets": _load(TARGETS_FILE, [])}
+    return {"targets": _load(TARGETS_FILE, "targets", [])}
 
 
 @app.post("/api/targets")
 async def add_target(payload: TargetPayload) -> dict:
-    targets = _load(TARGETS_FILE, [])
+    targets = _load(TARGETS_FILE, "targets", [])
     entry = {**payload.model_dump(), "id": str(uuid.uuid4())[:8],
              "created_at": datetime.now(timezone.utc).isoformat(),
              "last_run": None, "last_result": None}
     targets.append(entry)
-    _save(TARGETS_FILE, targets)
+    _save(TARGETS_FILE, "targets", targets)
     return {"ok": True, "id": entry["id"]}
 
 
 @app.patch("/api/targets/{target_id}")
 async def update_target(target_id: str, patch: TargetPatch) -> dict:
-    targets = _load(TARGETS_FILE, [])
+    targets = _load(TARGETS_FILE, "targets", [])
     for t in targets:
         if t["id"] == target_id:
             for k, v in patch.model_dump(exclude_none=True).items():
                 t[k] = v
-    _save(TARGETS_FILE, targets)
+    _save(TARGETS_FILE, "targets", targets)
     return {"ok": True}
 
 
 @app.delete("/api/targets/{target_id}")
 async def delete_target(target_id: str) -> dict:
-    targets = [t for t in _load(TARGETS_FILE, []) if t["id"] != target_id]
-    _save(TARGETS_FILE, targets)
+    targets = [t for t in _load(TARGETS_FILE, "targets", []) if t["id"] != target_id]
+    _save(TARGETS_FILE, "targets", targets)
     return {"ok": True}
 
 
@@ -438,48 +429,45 @@ class FileWritePayload(BaseModel):
 
 
 class GitOpPayload(BaseModel):
-    op: str            # "status" | "commit" | "push" | "pull" | "diff"
+    op: str
     message: str = "chore: automated edit via Bug Engine UI"
 
 
 @app.get("/api/repos")
 async def get_repos() -> dict:
-    return {"repos": _load(REPOS_FILE, [])}
+    return {"repos": _load(REPOS_FILE, "repos", [])}
 
 
 @app.post("/api/repos")
 async def add_repo(payload: RepoPayload) -> dict:
-    repos = _load(REPOS_FILE, [])
-    lp = Path(payload.local_path)
-    if not lp.exists():
-        raise HTTPException(400, f"Path does not exist: {payload.local_path}")
+    repos = _load(REPOS_FILE, "repos", [])
     entry = {**payload.model_dump(), "id": str(uuid.uuid4())[:8],
              "created_at": datetime.now(timezone.utc).isoformat()}
     repos.append(entry)
-    _save(REPOS_FILE, repos)
+    _save(REPOS_FILE, "repos", repos)
     return {"ok": True, "id": entry["id"]}
 
 
 @app.patch("/api/repos/{repo_id}")
 async def update_repo(repo_id: str, patch: RepoPatch) -> dict:
-    repos = _load(REPOS_FILE, [])
+    repos = _load(REPOS_FILE, "repos", [])
     for r in repos:
         if r["id"] == repo_id:
             for k, v in patch.model_dump(exclude_none=True).items():
                 r[k] = v
-    _save(REPOS_FILE, repos)
+    _save(REPOS_FILE, "repos", repos)
     return {"ok": True}
 
 
 @app.delete("/api/repos/{repo_id}")
 async def delete_repo(repo_id: str) -> dict:
-    repos = [r for r in _load(REPOS_FILE, []) if r["id"] != repo_id]
-    _save(REPOS_FILE, repos)
+    repos = [r for r in _load(REPOS_FILE, "repos", []) if r["id"] != repo_id]
+    _save(REPOS_FILE, "repos", repos)
     return {"ok": True}
 
 
 def _get_repo_or_404(repo_id: str) -> dict:
-    for r in _load(REPOS_FILE, []):
+    for r in _load(REPOS_FILE, "repos", []):
         if r["id"] == repo_id:
             return r
     raise HTTPException(404, "Repo not found.")
@@ -488,13 +476,16 @@ def _get_repo_or_404(repo_id: str) -> dict:
 @app.get("/api/repos/{repo_id}/tree")
 async def repo_tree(repo_id: str, path: str = Query(".")) -> dict:
     repo = _get_repo_or_404(repo_id)
-    base = Path(repo["local_path"])
-    target = (base / path).resolve()
+    base = Path(repo["local_path"]).resolve()
 
-    if not str(target).startswith(str(base.resolve())):
+    if not base.exists():
+        return {"path": path, "entries": []}
+
+    target = (base / path).resolve()
+    if not str(target).startswith(str(base)):
         raise HTTPException(403, "Access denied.")
     if not target.exists():
-        raise HTTPException(404, "Path not found.")
+        return {"path": path, "entries": []}
 
     entries = []
     if target.is_dir():
@@ -517,10 +508,10 @@ async def repo_tree(repo_id: str, path: str = Query(".")) -> dict:
 @app.get("/api/repos/{repo_id}/file")
 async def read_file(repo_id: str, path: str = Query(...)) -> dict:
     repo = _get_repo_or_404(repo_id)
-    base = Path(repo["local_path"])
+    base = Path(repo["local_path"]).resolve()
     target = (base / path).resolve()
 
-    if not str(target).startswith(str(base.resolve())):
+    if not str(target).startswith(str(base)):
         raise HTTPException(403, "Access denied.")
     if not target.exists() or not target.is_file():
         raise HTTPException(404, "File not found.")
@@ -547,10 +538,10 @@ async def read_file(repo_id: str, path: str = Query(...)) -> dict:
 @app.post("/api/repos/{repo_id}/file")
 async def write_file(repo_id: str, payload: FileWritePayload) -> dict:
     repo = _get_repo_or_404(repo_id)
-    base = Path(repo["local_path"])
+    base = Path(repo["local_path"]).resolve()
     target = (base / payload.path).resolve()
 
-    if not str(target).startswith(str(base.resolve())):
+    if not str(target).startswith(str(base)):
         raise HTTPException(403, "Access denied.")
 
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -576,8 +567,11 @@ async def git_op(repo_id: str, payload: GitOpPayload) -> dict:
         raise HTTPException(400, f"Unknown op: {payload.op!r}")
 
     def _run(cmd: list[str]) -> str:
-        r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
-        return (r.stdout + r.stderr).strip()
+        try:
+            r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+            return (r.stdout + r.stderr).strip()
+        except Exception as e:
+            return f"Error executing git command: {e}"
 
     if payload.op == "commit":
         out  = _run(["git", "add", "--all"])
@@ -646,12 +640,12 @@ async def _execute_pipeline(payload: RunPayload, run_id: str) -> None:
 
 
 def _update_target_last_run(url: str, result: dict) -> None:
-    targets = _load(TARGETS_FILE, [])
+    targets = _load(TARGETS_FILE, "targets", [])
     for t in targets:
         if t["url"] == url:
             t["last_run"]    = datetime.now(timezone.utc).isoformat()
             t["last_result"] = result.get("severity", "none")
-    _save(TARGETS_FILE, targets)
+    _save(TARGETS_FILE, "targets", targets)
 
 
 async def _run_queue_task(queue: list[dict]) -> None:
@@ -663,69 +657,9 @@ async def _run_queue_task(queue: list[dict]) -> None:
         _run_state.update({"status": "running", "run_id": rid})
         await _execute_pipeline(p, rid)
         await asyncio.sleep(2)
-    _save(QUEUE_FILE, [])
+    _save(QUEUE_FILE, "queue", [])
     _run_state["status"] = "done"
     _log("✅ Queue complete.")
-
-
-async def _scheduled_run() -> None:
-    cfg = _load(SCHEDULE_FILE, {})
-    if not cfg.get("url") or _run_state["status"] == "running":
-        return
-    p = RunPayload(url=cfg["url"], scenario=cfg.get("scenario",""),
-                   repo_path=cfg.get("repo_path","."),
-                   verify=cfg.get("verify",True),
-                   publish_pr=cfg.get("publish_pr",False))
-    rid = str(uuid.uuid4())[:8]
-    _run_state.update({"status":"running","log":[],"result":None,"run_id":rid})
-    _log(f"⏰ Scheduled run (id={rid})")
-    await _execute_pipeline(p, rid)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Scheduler helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
-_JOB = "auto_qa"
-
-def _apply_schedule(p: SchedulePayload) -> None:
-    _remove_job()
-    if p.mode == "interval" and p.interval_minutes:
-        trigger = IntervalTrigger(minutes=p.interval_minutes)
-    elif p.mode == "cron" and p.cron_expression:
-        parts = p.cron_expression.strip().split()
-        if len(parts) != 5:
-            raise ValueError("Cron must have 5 fields.")
-        trigger = CronTrigger(minute=parts[0],hour=parts[1],day=parts[2],
-                               month=parts[3],day_of_week=parts[4])
-    else:
-        return
-    scheduler.add_job(_scheduled_run, trigger=trigger, id=_JOB, replace_existing=True)
-
-def _remove_job() -> None:
-    if scheduler.get_job(_JOB): scheduler.remove_job(_JOB)
-
-def _next_run_time() -> Optional[str]:
-    job = scheduler.get_job(_JOB)
-    return job.next_run_time.isoformat() if job and job.next_run_time else None
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Startup / shutdown
-# ─────────────────────────────────────────────────────────────────────────────
-
-@app.on_event("startup")
-async def startup() -> None:
-    scheduler.start()
-    cfg = _load(SCHEDULE_FILE, {})
-    if cfg.get("mode","disabled") != "disabled":
-        try: _apply_schedule(SchedulePayload(**cfg))
-        except Exception: pass
-
-
-@app.on_event("shutdown")
-async def shutdown() -> None:
-    scheduler.shutdown(wait=False)
 
 
 if __name__ == "__main__":
