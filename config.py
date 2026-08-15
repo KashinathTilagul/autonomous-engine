@@ -3,9 +3,8 @@ config.py
 ─────────
 Centralised configuration for the Autonomous UI Bug-Finding Engine.
 
-All values are loaded from environment variables or .env.
-Optional defaults are provided so the app can boot on Vercel without
-crashing before the user inputs their keys in the Web UI.
+Configured for OmniRoute / OpenAI-compatible routing gateways with
+free API tiers and seamless model switching.
 """
 
 from __future__ import annotations
@@ -24,9 +23,7 @@ load_dotenv()
 
 class Settings(BaseSettings):
     """
-    Type-safe, validated settings.
-    Optional fields allow the app to initialize on serverless platforms
-    before user configuration via UI.
+    Type-safe settings for OmniRoute and autonomous QA engine.
     """
 
     model_config = SettingsConfigDict(
@@ -36,19 +33,22 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ── OpenRouter ────────────────────────────────────────────────────────────
+    # ── OmniRoute / Gateway ───────────────────────────────────────────────────
 
-    openrouter_api_key: Optional[SecretStr] = Field(
+    omniroute_api_key: Optional[SecretStr] = Field(
         default=None,
-        description="OpenRouter API key — entered via UI or .env",
+        alias="OMNIROUTE_API_KEY",
+        description="OmniRoute API key — entered via UI or .env",
     )
     model_name: str = Field(
-        default="x-ai/grok-4",
-        description="Model slug on OpenRouter (e.g. x-ai/grok-4, anthropic/claude-3.7-sonnet, openai/gpt-4o)",
+        default="deepseek/deepseek-r1:free",
+        alias="MODEL_NAME",
+        description="Default best free model tier or any custom model slug",
     )
-    openrouter_base_url: str = Field(
-        default="https://openrouter.ai/api/v1",
-        description="OpenRouter base URL (OpenAI-compatible).",
+    omniroute_base_url: str = Field(
+        default="https://api.omniroute.ai/v1",
+        alias="OMNIROUTE_BASE_URL",
+        description="OmniRoute base URL (OpenAI-compatible).",
     )
     llm_temperature: float = Field(
         default=0.0, ge=0.0, le=2.0,
@@ -141,7 +141,7 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Return the validated Settings singleton (read once, cached forever)."""
+    """Return the validated Settings singleton."""
     return Settings()
 
 
@@ -152,17 +152,19 @@ def build_llm(
     max_tokens: Optional[int] = None,
 ) -> ChatOpenAI:
     """
-    Build a ChatOpenAI instance pointed at OpenRouter.
-    Raises ValueError if API key is not yet set by user.
+    Build a ChatOpenAI instance pointed at OmniRoute.
     """
     cfg = get_settings()
-    if not cfg.openrouter_api_key or not cfg.openrouter_api_key.get_secret_value():
-        raise ValueError("OpenRouter API key is not configured. Please enter it in the Settings sidebar.")
+    api_key_val = (
+        cfg.omniroute_api_key.get_secret_value()
+        if cfg.omniroute_api_key
+        else "free-key"
+    )
 
     return ChatOpenAI(
         model=model_name or cfg.model_name,
-        openai_api_key=cfg.openrouter_api_key.get_secret_value(),
-        openai_api_base=cfg.openrouter_base_url,
+        openai_api_key=api_key_val,
+        openai_api_base=cfg.omniroute_base_url,
         temperature=temperature if temperature is not None else cfg.llm_temperature,
         max_tokens=max_tokens or cfg.llm_max_tokens,
         default_headers={

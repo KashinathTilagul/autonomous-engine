@@ -67,7 +67,7 @@ _run_state: dict[str, Any] = {
 
 # ── sensitive keys ────────────────────────────────────────────────────────────
 _SENSITIVE = {
-    "OPENROUTER_API_KEY", "GITHUB_TOKEN", "OPENHANDS_API_KEY",
+    "OMNIROUTE_API_KEY", "OPENROUTER_API_KEY", "GITHUB_TOKEN", "OPENHANDS_API_KEY",
 }
 _MASKED_RE = re.compile(r"^[•]+$")
 
@@ -88,7 +88,6 @@ def _read_env() -> dict[str, str]:
             data.update({k: v or "" for k, v in dotenv_values(ENV_FILE).items()})
         except Exception:
             pass
-    # Merge with memory store
     data.update(_mem_store["settings"])
     return data
 
@@ -155,9 +154,9 @@ async def get_settings() -> dict:
     env = _read_env()
     masked = {k: _mask(k, v) for k, v in env.items()}
     defaults = {
-        "OPENROUTER_API_KEY": "",
-        "MODEL_NAME": "x-ai/grok-4",
-        "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1",
+        "OMNIROUTE_API_KEY": "",
+        "MODEL_NAME": "deepseek/deepseek-r1:free",
+        "OMNIROUTE_BASE_URL": "https://api.omniroute.ai/v1",
         "LLM_TEMPERATURE": "0.0",
         "LLM_MAX_TOKENS": "4096",
         "OPENHANDS_API_URL": "http://localhost:3000",
@@ -173,9 +172,9 @@ async def get_settings() -> dict:
 
 
 class SettingsPayload(BaseModel):
-    OPENROUTER_API_KEY: str = ""
-    MODEL_NAME: str = "x-ai/grok-4"
-    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OMNIROUTE_API_KEY: str = ""
+    MODEL_NAME: str = "deepseek/deepseek-r1:free"
+    OMNIROUTE_BASE_URL: str = "https://api.omniroute.ai/v1"
     LLM_TEMPERATURE: str = "0.0"
     LLM_MAX_TOKENS: str = "4096"
     OPENHANDS_API_URL: str = "http://localhost:3000"

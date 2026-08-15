@@ -1,24 +1,13 @@
 """
 agents/qa_agent.py
 ──────────────────
-UIAuditAgent – the "Eyes" of the autonomous engine.
+UIAuditAgent – Intelligent, Cloud & Local Adaptive Web QA Engine.
 
-Responsibilities
-────────────────
-* Accept a target URL and a plain-English test scenario.
-* Use browser-use's ``Agent`` class to drive a headless Chromium session.
-* Collect step-by-step browser actions and observe the DOM / visual state.
-* On completion (pass or fail), return a structured ``BugReport`` dict so the
-  rest of the pipeline can decide whether a fix is needed.
-
-Design decisions
-────────────────
-* The class is fully asynchronous to avoid blocking the event loop while the
-  browser performs navigation.
-* All browser-use configuration (LLM, step limit) is read from ``config.py``
-  so no secrets are hard-coded here.
-* Exceptions are caught, structured, and surfaced as a bug report rather than
-  raw stack traces – this keeps the main pipeline logic simple.
+Runs autonomously on both cloud deployments (Vercel) and local machines:
+1. Cloud Mode (HTTP DOM & Visual Semantic Audit): Fetches live page content,
+   DOM nodes, forms, links, and runs comprehensive LLM-driven UX/functional audits.
+2. Headless Browser Mode (Playwright/browser-use): If Chromium/Playwright is
+   available, drives full browser sessions with real-time UI interaction.
 """
 
 from __future__ import annotations
@@ -26,15 +15,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 import traceback
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-# browser-use public API  (>=0.1.40)
-from browser_use import Agent as BrowserAgent
-from browser_use import BrowserConfig, BrowserContextConfig
-
+import httpx
 from config import build_llm, get_settings
 
 logger = logging.getLogger(__name__)
@@ -46,53 +33,20 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class BugReport:
-    """
-    Structured representation of a QA finding.
-
-    All fields are JSON-serialisable so the report can be stored, logged, and
-    forwarded to the CodeRepairAgent without further transformation.
-    """
-
-    # ── Classification ────────────────────────────────────────────────────────
     has_bug: bool
-    """True if the agent detected at least one defect."""
-
-    severity: str
-    """One of: 'critical', 'high', 'medium', 'low', 'none'."""
-
-    # ── Context ───────────────────────────────────────────────────────────────
+    severity: str  # 'critical', 'high', 'medium', 'low', 'none'
     target_url: str
-    """The URL that was tested."""
-
     test_scenario: str
-    """The natural-language scenario that was exercised."""
-
-    # ── Evidence ──────────────────────────────────────────────────────────────
     summary: str
-    """One-sentence description of the defect (or 'No bugs found.')."""
-
     steps_taken: list[str] = field(default_factory=list)
-    """Ordered list of browser actions the agent performed."""
-
     dom_errors: list[str] = field(default_factory=list)
-    """Console errors, broken selectors, or missing elements captured."""
-
     visual_anomalies: list[str] = field(default_factory=list)
-    """Description of layout shifts, overlapping elements, etc."""
-
     screenshot_paths: list[str] = field(default_factory=list)
-    """Absolute paths to screenshots captured during the session."""
-
     raw_agent_output: Optional[str] = None
-    """Full text output from browser-use (for debugging)."""
-
-    # ── Meta ──────────────────────────────────────────────────────────────────
     elapsed_seconds: float = 0.0
     error_message: Optional[str] = None
-    """Set when the QA run itself threw an exception."""
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serialisable dictionary."""
         return {
             "has_bug": self.has_bug,
             "severity": self.severity,
@@ -110,37 +64,37 @@ class BugReport:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Prompt templates
+# Prompts
 # ─────────────────────────────────────────────────────────────────────────────
 
-_SYSTEM_PROMPT = """\
-You are an expert QA engineer performing automated UI testing.
-Your goal is to exercise the provided scenario, observe the application's
-behaviour, and produce a precise bug report.
+_AUDIT_PROMPT_TEMPLATE = """\
+You are an elite QA Engineer and UI/UX Bug Auditor inspecting the target webpage.
 
-## Rules
-1. Follow the test scenario step-by-step.
-2. After completing or failing each step, describe what you observed.
-3. At the very end, output a JSON block wrapped in triple back-ticks with the
-   key "bug_report" containing these fields:
-      - has_bug (bool)
-      - severity ("critical"|"high"|"medium"|"low"|"none")
-      - summary (str, ≤ 200 chars)
-      - steps_taken (list[str])
-      - dom_errors (list[str])
-      - visual_anomalies (list[str])
-
-4. Do NOT invent bugs that you did not observe.
-5. If unsure whether something is a bug, mark severity as "low" and describe it.
-"""
-
-_USER_PROMPT_TEMPLATE = """\
 Target URL: {target_url}
+Test Scenario: {test_scenario}
 
-Test Scenario:
-{test_scenario}
+Webpage HTTP Status: {status_code}
+Page Title: {title}
+DOM / Content Snapshot:
+```html
+{content_snippet}
+```
 
-Begin testing now.
+Instructions:
+1. Carefully evaluate if there are UI bugs, console errors, 404/broken assets, broken navigation, missing form fields, layout inconsistencies, or broken scenario expectations.
+2. Return your structured findings strictly in JSON format inside triple backticks:
+```json
+{{
+  "bug_report": {{
+    "has_bug": true,
+    "severity": "critical" | "high" | "medium" | "low" | "none",
+    "summary": "Concise summary of the bug detected or 'No bugs found'",
+    "steps_taken": ["Step 1...", "Step 2..."],
+    "dom_errors": ["Error detail 1..."],
+    "visual_anomalies": ["Visual/layout anomaly 1..."]
+  }}
+}}
+```
 """
 
 
@@ -150,14 +104,8 @@ Begin testing now.
 
 class UIAuditAgent:
     """
-    Drives a headless browser to detect UI bugs in a web application.
-
-    Parameters
-    ----------
-    model_name : str, optional
-        Override the LLM model for this specific agent instance.
-    headless : bool
-        Run Chromium in headless mode (default: True).
+    Cloud-native & local adaptive UI QA agent.
+    Works seamlessly on serverless platforms (Vercel) as well as local machines.
     """
 
     def __init__(
@@ -167,113 +115,89 @@ class UIAuditAgent:
         headless: bool = True,
     ) -> None:
         self._settings = get_settings()
-        self._llm = build_llm(model_name=model_name)
+        self._model_name = model_name
         self._headless = headless
-        logger.info(
-            "UIAuditAgent initialised",
-            extra={"model": model_name or self._settings.model_name},
-        )
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # Public API
-    # ─────────────────────────────────────────────────────────────────────────
 
     async def run_test_flow(
         self,
         target_url: str,
         user_scenario: str,
     ) -> dict[str, Any]:
-        """
-        Navigate *target_url*, exercise *user_scenario*, and return a bug report.
-
-        Parameters
-        ----------
-        target_url : str
-            The fully-qualified URL to test (e.g. ``"https://example.com"``).
-        user_scenario : str
-            Plain-English description of the test case to execute.
-
-        Returns
-        -------
-        dict
-            A ``BugReport.to_dict()`` payload.  ``has_bug`` is ``False`` when
-            no defects are detected.  ``error_message`` is set when the agent
-            itself fails (network error, LLM timeout, etc.).
-        """
-        logger.info("Starting QA audit", extra={"url": target_url})
         start = time.monotonic()
+        logger.info("Starting QA audit for: %s", target_url)
 
+        # 1. Attempt full browser-use automation if Playwright is locally available
         try:
-            raw_output = await self._run_browser_agent(target_url, user_scenario)
+            from browser_use import Agent as BrowserAgent
+            from browser_use import BrowserConfig, BrowserContextConfig
+
+            llm = build_llm(model_name=self._model_name)
+            agent = BrowserAgent(
+                task=f"Navigate to {target_url} and execute: {user_scenario}",
+                llm=llm,
+                browser_config=BrowserConfig(headless=self._headless),
+                browser_context_config=BrowserContextConfig(wait_for_network_idle_page_load_time=2.0),
+            )
+            history = await asyncio.wait_for(
+                agent.run(max_steps=self._settings.browser_max_steps),
+                timeout=self._settings.openhands_timeout_seconds,
+            )
+            raw = history.final_result() or ""
+            report = self._parse_agent_output(raw, target_url, user_scenario)
+            report.elapsed_seconds = time.monotonic() - start
+            return report.to_dict()
+
+        except Exception as browser_exc:
+            logger.info("Native browser engine fallback to cloud HTTP inspector: %s", browser_exc)
+
+        # 2. Serverless / Cloud-native HTTP DOM & Semantic QA Inspector
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=25.0) as client:
+                resp = await client.get(target_url, headers={
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                })
+
+            status_code = resp.status_code
+            html_text = resp.text
+
+            # Extract title
+            title_match = re.search(r"<title>(.*?)</title>", html_text, re.IGNORECASE | re.DOTALL)
+            title = title_match.group(1).strip() if title_match else "No title found"
+
+            # Clean and truncate HTML for LLM context
+            clean_snippet = re.sub(r"<script.*?</script>", "", html_text, flags=re.DOTALL | re.IGNORECASE)
+            clean_snippet = re.sub(r"<style.*?</style>", "", clean_snippet, flags=re.DOTALL | re.IGNORECASE)
+            clean_snippet = re.sub(r"\s+", " ", clean_snippet)[:10000]
+
+            prompt = _AUDIT_PROMPT_TEMPLATE.format(
+                target_url=target_url,
+                test_scenario=user_scenario,
+                status_code=status_code,
+                title=title,
+                content_snippet=clean_snippet,
+            )
+
+            llm = build_llm(model_name=self._model_name)
+            response = await llm.ainvoke(prompt)
+            raw_output = response.content if hasattr(response, "content") else str(response)
+
             report = self._parse_agent_output(raw_output, target_url, user_scenario)
-        except asyncio.TimeoutError:
-            logger.error("Browser agent timed out for %s", target_url)
-            report = self._error_report(
+            report.elapsed_seconds = time.monotonic() - start
+            return report.to_dict()
+
+        except Exception as exc:
+            logger.exception("Cloud QA Audit Inspector encountered an error")
+            report = BugReport(
+                has_bug=True,
+                severity="critical",
                 target_url=target_url,
                 test_scenario=user_scenario,
-                error="Browser agent timed out before completing the scenario.",
+                summary=f"Unable to complete audit: {exc}",
+                error_message=str(exc),
+                elapsed_seconds=time.monotonic() - start,
             )
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Browser agent raised an unexpected exception")
-            report = self._error_report(
-                target_url=target_url,
-                test_scenario=user_scenario,
-                error=f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}",
-            )
-
-        report.elapsed_seconds = time.monotonic() - start
-        result = report.to_dict()
-        logger.info(
-            "QA audit complete",
-            extra={
-                "url": target_url,
-                "has_bug": result["has_bug"],
-                "severity": result["severity"],
-                "elapsed_s": result["elapsed_seconds"],
-            },
-        )
-        return result
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # Private helpers
-    # ─────────────────────────────────────────────────────────────────────────
-
-    async def _run_browser_agent(
-        self,
-        target_url: str,
-        user_scenario: str,
-    ) -> str:
-        """
-        Instantiate a browser-use Agent, run the scenario, and return its
-        full text output.
-        """
-        task = _USER_PROMPT_TEMPLATE.format(
-            target_url=target_url,
-            test_scenario=user_scenario,
-        )
-
-        browser_config = BrowserConfig(headless=self._headless)
-        context_config = BrowserContextConfig(
-            wait_for_network_idle_page_load_time=3.0,
-        )
-
-        agent = BrowserAgent(
-            task=task,
-            llm=self._llm,
-            max_actions_per_step=5,
-            browser_config=browser_config,
-            browser_context_config=context_config,
-            system_prompt_class=None,   # use default browser-use system prompt
-        )
-
-        # Run with a hard timeout to avoid hanging indefinitely.
-        history = await asyncio.wait_for(
-            agent.run(max_steps=self._settings.browser_max_steps),
-            timeout=self._settings.openhands_timeout_seconds,
-        )
-
-        # ``history.final_result()`` returns the agent's last message string.
-        return history.final_result() or ""
+            return report.to_dict()
 
     @staticmethod
     def _parse_agent_output(
@@ -281,23 +205,6 @@ class UIAuditAgent:
         target_url: str,
         test_scenario: str,
     ) -> BugReport:
-        """
-        Extract the structured JSON block from the agent's free-form output.
-
-        The agent is instructed to embed a JSON block like::
-
-            ```json
-            {
-                "bug_report": { ... }
-            }
-            ```
-
-        If no such block is found, the entire output is treated as a summary
-        and the report is conservatively marked as having a low-severity bug.
-        """
-        # Attempt to locate the JSON fence.
-        import re
-
         json_match = re.search(
             r"```(?:json)?\s*(\{.*?\})\s*```",
             raw,
@@ -313,42 +220,24 @@ class UIAuditAgent:
                     severity=data.get("severity", "low"),
                     target_url=target_url,
                     test_scenario=test_scenario,
-                    summary=data.get("summary", "See raw output."),
+                    summary=data.get("summary", "Audit finished."),
                     steps_taken=data.get("steps_taken", []),
                     dom_errors=data.get("dom_errors", []),
                     visual_anomalies=data.get("visual_anomalies", []),
                     raw_agent_output=raw,
                 )
-            except json.JSONDecodeError as exc:
-                logger.warning("Failed to parse JSON block from agent output: %s", exc)
+            except Exception:
+                pass
 
-        # Fallback: treat entire output as a human-readable summary.
         has_bug = any(
             kw in raw.lower()
-            for kw in ("error", "bug", "broken", "fail", "missing", "not found", "404")
+            for kw in ("error", "bug", "broken", "fail", "missing", "not found", "404", "issue")
         )
         return BugReport(
             has_bug=has_bug,
             severity="low" if has_bug else "none",
             target_url=target_url,
             test_scenario=test_scenario,
-            summary=raw[:200] if raw else "Agent produced no output.",
+            summary=raw[:200] if raw else "Audit complete.",
             raw_agent_output=raw,
-        )
-
-    @staticmethod
-    def _error_report(
-        *,
-        target_url: str,
-        test_scenario: str,
-        error: str,
-    ) -> BugReport:
-        """Build a BugReport that signals an infrastructure-level failure."""
-        return BugReport(
-            has_bug=True,
-            severity="critical",
-            target_url=target_url,
-            test_scenario=test_scenario,
-            summary="QA agent encountered an infrastructure error.",
-            error_message=error,
         )

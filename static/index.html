@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Autonomous UI Bug Engine</title>
-  <meta name="description" content="AI-powered autonomous UI bug detection, scheduling, multi-repo code editor and auto-fix pipeline powered by OpenRouter." />
+  <title>Autonomous UI Bug Engine (OmniRoute)</title>
+  <meta name="description" content="AI-powered autonomous UI bug detection, scheduling, multi-repo code editor and auto-fix pipeline powered by OmniRoute with free models." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
@@ -57,10 +57,12 @@
     .f textarea{resize:vertical;min-height:60px}
     .fh{font-size:10px;color:var(--tm);margin-top:3px}
 
-    /* Quick Preset Chips */
+    /* Chips */
     .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
     .chip{font-size:10px;padding:2px 7px;border-radius:12px;background:var(--bg3);border:1px solid var(--b);color:var(--td);cursor:pointer;transition:var(--tr)}
-    .chip:hover{border-color:var(--ac);color:var(--tx)}
+    .chip.free{border-color:rgba(72,187,120,.4);color:var(--gr)}
+    .chip.best{border-color:rgba(99,179,237,.5);color:var(--ac);font-weight:600}
+    .chip:hover{border-color:var(--ac);color:var(--tx);transform:translateY(-1px)}
 
     /* ── Main ───────────────────────────────────────── */
     .mn{flex:1;display:flex;flex-direction:column;overflow:hidden}
@@ -240,41 +242,46 @@
   <div class="sb-head">
     <div class="logo">
       <div class="logo-ic">🤖</div>
-      <div><div class="logo-nm">Bug Engine</div><div class="logo-sb">Autonomous UI Repair Pipeline</div></div>
+      <div><div class="logo-nm">Bug Engine</div><div class="logo-sb">Powered by OmniRoute</div></div>
     </div>
   </div>
   <div class="sb-sc">
 
-    <!-- OpenRouter LLM Config -->
+    <!-- OmniRoute LLM Config -->
     <div class="ac">
-      <button class="ac-hd op" onclick="acc(this)"><span>⚡ OpenRouter LLM</span><span class="ch">▼</span></button>
+      <button class="ac-hd op" onclick="acc(this)"><span>⚡ OmniRoute Gateway</span><span class="ch">▼</span></button>
       <div class="ac-bd op">
         <div class="f">
-          <label>OpenRouter API Key</label>
-          <input type="password" id="OPENROUTER_API_KEY" placeholder="sk-or-v1-…" autocomplete="off"/>
-          <div class="fh">Get key from <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--ac)">openrouter.ai/keys</a></div>
+          <label>OmniRoute API Key (Optional for free models)</label>
+          <input type="password" id="OMNIROUTE_API_KEY" placeholder="omni_... or leave blank for free tier" autocomplete="off"/>
+          <div class="fh">Free tier active by default! Add key for priority rate limits.</div>
         </div>
         
         <div class="f">
-          <label>Model ID (Any Model on OpenRouter)</label>
-          <input type="text" id="MODEL_NAME" placeholder="e.g. x-ai/grok-4, anthropic/claude-3.7-sonnet" />
-          <div class="fh">Type ANY model slug from <a href="https://openrouter.ai/models" target="_blank" style="color:var(--ac)">openrouter.ai/models</a></div>
+          <label>Selected Model</label>
+          <input type="text" id="MODEL_NAME" value="deepseek/deepseek-r1:free" placeholder="deepseek/deepseek-r1:free" />
+          <div class="fh">Click any free or top-tier model below:</div>
+          
+          <div style="font-size:10px;color:var(--gr);font-weight:600;margin-top:6px;text-transform:uppercase">✨ Free Models Available:</div>
+          <div class="chips">
+            <span class="chip free best" onclick="setModel('deepseek/deepseek-r1:free')">⭐ DeepSeek R1 (Free - Best)</span>
+            <span class="chip free" onclick="setModel('google/gemini-2.0-flash-lite-preview:free')">Gemini 2.0 Flash (Free)</span>
+            <span class="chip free" onclick="setModel('meta-llama/llama-3.3-70b-instruct:free')">Llama 3.3 70B (Free)</span>
+            <span class="chip free" onclick="setModel('qwen/qwen-2.5-72b-instruct:free')">Qwen 2.5 72B (Free)</span>
+            <span class="chip free" onclick="setModel('mistralai/mistral-7b-instruct:free')">Mistral 7B (Free)</span>
+          </div>
+
+          <div style="font-size:10px;color:var(--ac);font-weight:600;margin-top:8px;text-transform:uppercase">🚀 Premium Models:</div>
           <div class="chips">
             <span class="chip" onclick="setModel('x-ai/grok-4')">xAI Grok-4</span>
-            <span class="chip" onclick="setModel('x-ai/grok-3')">xAI Grok-3</span>
-            <span class="chip" onclick="setModel('anthropic/claude-3.7-sonnet')">Claude 3.7</span>
-            <span class="chip" onclick="setModel('anthropic/claude-3.5-sonnet')">Claude 3.5</span>
+            <span class="chip" onclick="setModel('anthropic/claude-3.7-sonnet')">Claude 3.7 Sonnet</span>
             <span class="chip" onclick="setModel('openai/gpt-4o')">GPT-4o</span>
-            <span class="chip" onclick="setModel('openai/gpt-4o-mini')">GPT-4o mini</span>
-            <span class="chip" onclick="setModel('meta-llama/llama-3.3-70b-instruct')">Llama 3.3 70B</span>
-            <span class="chip" onclick="setModel('google/gemini-2.0-flash-001')">Gemini 2.0 Flash</span>
-            <span class="chip" onclick="setModel('deepseek/deepseek-r1')">DeepSeek R1</span>
           </div>
         </div>
 
         <div class="f">
-          <label>Base URL</label>
-          <input type="text" id="OPENROUTER_BASE_URL" value="https://openrouter.ai/api/v1" />
+          <label>OmniRoute Base URL</label>
+          <input type="text" id="OMNIROUTE_BASE_URL" value="https://api.omniroute.ai/v1" />
         </div>
         <div class="f"><label>Temperature</label><input type="number" id="LLM_TEMPERATURE" value="0.0" min="0" max="2" step="0.1"/></div>
         <div class="f"><label>Max Tokens</label><input type="number" id="LLM_MAX_TOKENS" value="4096" min="256" step="256"/></div>
@@ -314,7 +321,7 @@
 
   </div>
   <div class="sb-ft">
-    <div class="sv-note" id="svNote">✓ Saved securely to .env</div>
+    <div class="sv-note" id="svNote">✓ Saved securely</div>
     <button class="btn btn-p btn-full" onclick="saveSettings()" id="svBtn">💾 Save Settings</button>
   </div>
 </aside>
@@ -336,7 +343,7 @@
   <!-- ── RUN ─────────────────────────────────── -->
   <div class="panel on" id="p-run">
     <div class="card">
-      <div class="ct"><span>🚀 Run Pipeline</span></div>
+      <div class="ct"><span>🚀 Run Pipeline (OmniRoute Free Models Ready)</span></div>
       <div style="display:flex;flex-direction:column;gap:11px">
         <div class="f"><label>Target URL *</label><input type="url" id="r-url" placeholder="https://staging.example.com"/></div>
         <div class="f"><label>Test Scenario</label><textarea id="r-sc" rows="3" placeholder="Navigate the site as a new user and report any visual or functional bugs…"></textarea></div>
@@ -416,7 +423,6 @@
         <div class="repo-list" id="repoList">
           <div class="empty-state" style="padding:20px 10px"><div class="em-ic" style="font-size:24px">📁</div>No repos added</div>
         </div>
-        <!-- Add repo mini-form -->
         <div id="addRepoForm" style="display:none;padding:10px;border-top:1px solid var(--b)">
           <div class="f"><label>Name</label><input type="text" id="rp-name" placeholder="My App"/></div>
           <div class="f"><label>Local Path</label><input type="text" id="rp-path" placeholder="/Users/you/projects/app"/></div>
@@ -584,7 +590,7 @@ function setModel(m){
 async function loadSettings(){
   try{
     const d=await fetch('/api/settings').then(r=>r.json());
-    ['OPENROUTER_API_KEY','MODEL_NAME','OPENROUTER_BASE_URL','LLM_TEMPERATURE','LLM_MAX_TOKENS',
+    ['OMNIROUTE_API_KEY','MODEL_NAME','OMNIROUTE_BASE_URL','LLM_TEMPERATURE','LLM_MAX_TOKENS',
      'OPENHANDS_API_URL','OPENHANDS_API_KEY','OPENHANDS_TIMEOUT_SECONDS',
      'GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH',
      'BROWSER_MAX_STEPS','LOG_LEVEL']
@@ -595,7 +601,7 @@ async function saveSettings(){
   const btn=document.getElementById('svBtn');
   btn.disabled=true; btn.textContent='Saving…';
   const p={};
-  ['OPENROUTER_API_KEY','MODEL_NAME','OPENROUTER_BASE_URL','LLM_TEMPERATURE','LLM_MAX_TOKENS',
+  ['OMNIROUTE_API_KEY','MODEL_NAME','OMNIROUTE_BASE_URL','LLM_TEMPERATURE','LLM_MAX_TOKENS',
    'OPENHANDS_API_URL','OPENHANDS_API_KEY','OPENHANDS_TIMEOUT_SECONDS',
    'GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH','BROWSER_MAX_STEPS','LOG_LEVEL']
   .forEach(k=>{const el=document.getElementById(k);if(el)p[k]=el.value;});
@@ -891,7 +897,7 @@ async function saveSched(){
   try{const r=await fetch('/api/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
     const d=await r.json();if(!r.ok)throw new Error(d.detail);
     updateSchedBar(d);setSt('sched','Scheduled');
-    alert('✅ Scheduled! Next: '+(d.next_run?new Date(d.next_run).toLocaleString():'pending'));
+    alert('✅ Scheduled!');
   }catch(e){alert('Error: '+e.message);}
 }
 async function disableSched(){await fetch('/api/schedule',{method:'DELETE'});document.getElementById('sched-bar').style.display='none';setSt('','Idle');}
@@ -911,7 +917,7 @@ async function loadSchedule(){
   }catch(_){}
 }
 function updateSchedBar(d){const bar=document.getElementById('sched-bar');bar.style.display='';
-  document.getElementById('sched-next').textContent='Next: '+(d.next_run?new Date(d.next_run).toLocaleString():'pending');}
+  document.getElementById('sched-next').textContent='Active';}
 
 /* ════════ Queue ════════ */
 async function loadQueue(){
