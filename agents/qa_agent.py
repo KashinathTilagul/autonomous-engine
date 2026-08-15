@@ -1,13 +1,8 @@
 """
 agents/qa_agent.py
 ──────────────────
-UIAuditAgent – Intelligent, Cloud & Local Adaptive Web QA Engine.
-
-Runs autonomously on both cloud deployments (Vercel) and local machines:
-1. Cloud Mode (HTTP DOM & Visual Semantic Audit): Fetches live page content,
-   DOM nodes, forms, links, and runs comprehensive LLM-driven UX/functional audits.
-2. Headless Browser Mode (Playwright/browser-use): If Chromium/Playwright is
-   available, drives full browser sessions with real-time UI interaction.
+UIAuditAgent – Detailed, Transparent UI QA Auditor.
+Provides granular inspection steps, DOM analysis, and clear failure diagnoses.
 """
 
 from __future__ import annotations
@@ -26,10 +21,6 @@ from config import build_llm, get_settings
 
 logger = logging.getLogger(__name__)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Data model
-# ─────────────────────────────────────────────────────────────────────────────
 
 @dataclass
 class BugReport:
@@ -63,49 +54,45 @@ class BugReport:
         }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Prompts
-# ─────────────────────────────────────────────────────────────────────────────
-
 _AUDIT_PROMPT_TEMPLATE = """\
-You are an elite QA Engineer and UI/UX Bug Auditor inspecting the target webpage.
+You are an expert QA Engineer and Web Application Auditor inspecting the following target page:
 
 Target URL: {target_url}
 Test Scenario: {test_scenario}
-
-Webpage HTTP Status: {status_code}
+HTTP Response Code: {status_code}
 Page Title: {title}
-DOM / Content Snapshot:
+
+Page HTML / DOM Snippet:
 ```html
 {content_snippet}
 ```
 
 Instructions:
-1. Carefully evaluate if there are UI bugs, console errors, 404/broken assets, broken navigation, missing form fields, layout inconsistencies, or broken scenario expectations.
-2. Return your structured findings strictly in JSON format inside triple backticks:
+1. Examine if the page successfully loaded according to the scenario, or if there are broken components, missing login fields, broken buttons, 4xx/5xx errors, or UI anomalies.
+2. If the page loaded normally and matches the scenario with no errors, mark "has_bug": false and "severity": "none".
+3. Return your structured findings strictly in JSON format inside triple backticks:
 ```json
 {{
   "bug_report": {{
-    "has_bug": true,
-    "severity": "critical" | "high" | "medium" | "low" | "none",
-    "summary": "Concise summary of the bug detected or 'No bugs found'",
-    "steps_taken": ["Step 1...", "Step 2..."],
-    "dom_errors": ["Error detail 1..."],
-    "visual_anomalies": ["Visual/layout anomaly 1..."]
+    "has_bug": false,
+    "severity": "none",
+    "summary": "Page loaded successfully with all expected elements.",
+    "steps_taken": [
+      "1. Fetched and verified HTTP status code",
+      "2. Analyzed page title and meta elements",
+      "3. Evaluated form inputs and buttons for the scenario"
+    ],
+    "dom_errors": [],
+    "visual_anomalies": []
   }}
 }}
 ```
 """
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Agent class
-# ─────────────────────────────────────────────────────────────────────────────
-
 class UIAuditAgent:
     """
-    Cloud-native & local adaptive UI QA agent.
-    Works seamlessly on serverless platforms (Vercel) as well as local machines.
+    Detailed, cloud-native UI QA Auditor.
     """
 
     def __init__(
@@ -118,15 +105,22 @@ class UIAuditAgent:
         self._model_name = model_name
         self._headless = headless
 
+    def _normalize_url(self, url: str) -> str:
+        url = url.strip()
+        if not url.startswith("http://") and not url.startswith("https://"):
+            url = "https://" + url
+        return url
+
     async def run_test_flow(
         self,
         target_url: str,
         user_scenario: str,
     ) -> dict[str, Any]:
         start = time.monotonic()
+        target_url = self._normalize_url(target_url)
         logger.info("Starting QA audit for: %s", target_url)
 
-        # 1. Attempt full browser-use automation if Playwright is locally available
+        # 1. Attempt Playwright browser-use automation if available
         try:
             from browser_use import Agent as BrowserAgent
             from browser_use import BrowserConfig, BrowserContextConfig
@@ -148,11 +142,11 @@ class UIAuditAgent:
             return report.to_dict()
 
         except Exception as browser_exc:
-            logger.info("Native browser engine fallback to cloud HTTP inspector: %s", browser_exc)
+            logger.info("Playwright not present, running HTTP DOM inspector: %s", browser_exc)
 
-        # 2. Serverless / Cloud-native HTTP DOM & Semantic QA Inspector
+        # 2. HTTP Web DOM & Content Inspector
         try:
-            async with httpx.AsyncClient(follow_redirects=True, timeout=25.0) as client:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=20.0, verify=False) as client:
                 resp = await client.get(target_url, headers={
                     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
@@ -161,18 +155,16 @@ class UIAuditAgent:
             status_code = resp.status_code
             html_text = resp.text
 
-            # Extract title
             title_match = re.search(r"<title>(.*?)</title>", html_text, re.IGNORECASE | re.DOTALL)
-            title = title_match.group(1).strip() if title_match else "No title found"
+            title = title_match.group(1).strip() if title_match else "Untitled"
 
-            # Clean and truncate HTML for LLM context
             clean_snippet = re.sub(r"<script.*?</script>", "", html_text, flags=re.DOTALL | re.IGNORECASE)
             clean_snippet = re.sub(r"<style.*?</style>", "", clean_snippet, flags=re.DOTALL | re.IGNORECASE)
-            clean_snippet = re.sub(r"\s+", " ", clean_snippet)[:10000]
+            clean_snippet = re.sub(r"\s+", " ", clean_snippet)[:8000]
 
             prompt = _AUDIT_PROMPT_TEMPLATE.format(
                 target_url=target_url,
-                test_scenario=user_scenario,
+                test_scenario=user_scenario or "Inspect page UI and functionality",
                 status_code=status_code,
                 title=title,
                 content_snippet=clean_snippet,
@@ -187,14 +179,27 @@ class UIAuditAgent:
             return report.to_dict()
 
         except Exception as exc:
-            logger.exception("Cloud QA Audit Inspector encountered an error")
+            logger.exception("HTTP Inspector failed to connect")
+            err_str = str(exc)
+            # Give human readable explanation
+            if "Name or service not known" in err_str or "nodename nor servname provided" in err_str:
+                summary = f"Cannot reach '{target_url}' (DNS lookup failed). Verify the domain is active."
+            elif "Connection refused" in err_str:
+                summary = f"Connection refused at '{target_url}'. The server might be down or not accepting connections."
+            elif "timed out" in err_str.lower():
+                summary = f"Connection to '{target_url}' timed out after 20s."
+            else:
+                summary = f"Network connection failed: {err_str}"
+
             report = BugReport(
                 has_bug=True,
                 severity="critical",
                 target_url=target_url,
                 test_scenario=user_scenario,
-                summary=f"Unable to complete audit: {exc}",
-                error_message=str(exc),
+                summary=summary,
+                steps_taken=[f"1. Attempted HTTP connection to {target_url}", "2. Request failed before receiving response"],
+                dom_errors=[f"Network Error: {err_str}"],
+                error_message=err_str,
                 elapsed_seconds=time.monotonic() - start,
             )
             return report.to_dict()
@@ -217,10 +222,10 @@ class UIAuditAgent:
                 data: dict = payload.get("bug_report", payload)
                 return BugReport(
                     has_bug=bool(data.get("has_bug", False)),
-                    severity=data.get("severity", "low"),
+                    severity=data.get("severity", "none"),
                     target_url=target_url,
                     test_scenario=test_scenario,
-                    summary=data.get("summary", "Audit finished."),
+                    summary=data.get("summary", "Audit complete."),
                     steps_taken=data.get("steps_taken", []),
                     dom_errors=data.get("dom_errors", []),
                     visual_anomalies=data.get("visual_anomalies", []),
@@ -231,11 +236,11 @@ class UIAuditAgent:
 
         has_bug = any(
             kw in raw.lower()
-            for kw in ("error", "bug", "broken", "fail", "missing", "not found", "404", "issue")
+            for kw in ("error", "broken", "failed", "missing element", "404 not found")
         )
         return BugReport(
             has_bug=has_bug,
-            severity="low" if has_bug else "none",
+            severity="medium" if has_bug else "none",
             target_url=target_url,
             test_scenario=test_scenario,
             summary=raw[:200] if raw else "Audit complete.",

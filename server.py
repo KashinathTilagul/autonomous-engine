@@ -621,16 +621,34 @@ async def _execute_pipeline(payload: RunPayload, run_id: str) -> None:
         )
         result["run_id"] = run_id
         if result.get("bug_found"):
-            _log(f"🐛 Bug found ({result.get('severity','?')}) — {result.get('summary','')}")
+            _log(f"🐛 Result: Bug Detected ({result.get('severity','?')})")
+            _log(f"   Summary: {result.get('summary','')}")
+            if result.get("dom_errors"):
+                for de in result.get("dom_errors", []):
+                    _log(f"   ⚠️ DOM / Network Issue: {de}")
+            if result.get("steps_taken"):
+                _log("   📋 Diagnostic Steps:")
+                for st in result.get("steps_taken", []):
+                    _log(f"      {st}")
         else:
-            _log("✅ No bugs detected.")
-        if result.get("fixed"):    _log("🔧 Fix applied.")
-        if result.get("pr_url"):   _log(f"📬 PR: {result['pr_url']}")
-        if result.get("error"):    _log(f"❌ {result['error']}")
+            _log("✅ Result: No bugs detected on page.")
+            if result.get("summary"):
+                _log(f"   Summary: {result.get('summary','')}")
+            if result.get("steps_taken"):
+                for st in result.get("steps_taken", []):
+                    _log(f"   ✓ {st}")
+
+        if result.get("fixed"):
+            _log("🔧 Fix planned / applied.")
+        if result.get("pr_url"):
+            _log(f"📬 PR: {result['pr_url']}")
+        if result.get("error"):
+            _log(f"❌ Details: {result['error']}")
+
         _run_state.update({"result": result, "status": "done"})
         _append_history(result)
         _update_target_last_run(payload.url, result)
-        _log("🏁 Done.")
+        _log("🏁 Audit Finished.")
     except Exception as exc:
         _log(f"💥 {exc}")
         _run_state.update({"status": "error",
