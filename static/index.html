@@ -136,6 +136,15 @@
     .step-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;margin-bottom:6px}
     .step-num{background:var(--bg3);color:var(--ac);font-weight:700;padding:2px 7px;border-radius:6px;font-size:10px}
 
+    /* Next Step Prompt Banner */
+    .next-step-banner{background:linear-gradient(135deg,rgba(56,189,248,.1),rgba(99,102,241,.1));border:1px solid var(--bhi);border-radius:var(--rlg);padding:18px;margin-top:16px;display:none;animation:pop .25s ease}
+    .next-step-banner.show{display:flex;flex-direction:column;gap:12px}
+    .ns-head{display:flex;align-items:center;justify-content:space-between}
+    .ns-title{font-size:14px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:8px}
+    .ns-timer{font-size:11px;color:var(--ac);font-weight:600;background:var(--ag);padding:3px 8px;border-radius:12px}
+    .ns-desc{font-size:12px;color:var(--td);line-height:1.6}
+    .ns-actions{display:flex;gap:10px;align-items:center}
+
     /* Console */
     .con{background:#04060a;border:1px solid var(--b);border-radius:var(--rlg);overflow:hidden}
     .con-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--b);background:var(--bg1)}
@@ -335,7 +344,7 @@
       
       <!-- Stepper / Pipeline Progress Visualizer -->
       <div class="timeline">
-        <div class="tl-step done" id="tls-1">
+        <div class="tl-step" id="tls-1">
           <div class="tl-dot">1</div>
           <div class="tl-title">URL Inspection</div>
         </div>
@@ -370,8 +379,26 @@
         </div>
       </div>
 
+      <!-- Interactive Next Step Approval Banner -->
+      <div class="next-step-banner" id="nextStepBanner">
+        <div class="ns-head">
+          <div class="ns-title">
+            <span>⚡ Next Action Recommended:</span>
+            <span id="nextActionName">Generate Code Fix Plan</span>
+          </div>
+          <span class="ns-timer" id="autoAdvanceTimer">Auto-proceeding in 8s...</span>
+        </div>
+        <div class="ns-desc" id="nextActionDesc">
+          The audit detected areas of improvement. You can approve proceeding to Step 3 (AI Code Repair) immediately or pause.
+        </div>
+        <div class="ns-actions">
+          <button class="btn btn-p btn-sm" onclick="approveNextStep()">✓ Approve & Proceed Now</button>
+          <button class="btn btn-g btn-sm" onclick="pauseNextStep()">⏸ Pause / Wait</button>
+        </div>
+      </div>
+
       <!-- Live Stream Console -->
-      <div class="con">
+      <div class="con" style="margin-top:16px">
         <div class="con-hd">
           <div class="cdots"><span class="cr"></span><span class="cy"></span><span class="cg"></span></div>
           <div style="font-size:11px;font-weight:700;color:var(--td);text-transform:uppercase">📡 Live Diagnostic Stream</div>
@@ -383,7 +410,7 @@
       <!-- Step-by-Step Breakdown and Result Card -->
       <div id="resSec" style="display:none;margin-top:16px">
         <div class="card" style="margin-bottom:0">
-          <div class="ct"><span>📊 Inspection Results & Step Breakdown</span></div>
+          <div class="ct"><span>📊 Inspection Results & Diagnostic Breakdown</span></div>
           <div class="rg">
             <div class="rc"><div class="rl">Bug Found</div><div class="rv" id="rv-bg">—</div></div>
             <div class="rc"><div class="rl">Severity</div><div class="rv" id="rv-sv">—</div></div>
@@ -394,11 +421,7 @@
 
           <div style="margin-top:14px">
             <div style="font-size:11px;font-weight:700;color:var(--td);text-transform:uppercase;margin-bottom:8px">📋 Diagnostic Steps Executed:</div>
-            <div id="stepContainer" class="step-box">
-              <div class="step-item"><span class="step-num">1</span><span>Fetched live HTTP DOM headers and status code</span></div>
-              <div class="step-item"><span class="step-num">2</span><span>Inspected form elements, labels, buttons, and navigation</span></div>
-              <div class="step-item"><span class="step-num">3</span><span>Evaluated layout integrity and network health</span></div>
-            </div>
+            <div id="stepContainer" class="step-box"></div>
           </div>
         </div>
       </div>
@@ -475,11 +498,12 @@
 
 <script>
 /* ════════════════════════════════════════════════
-   Client State & LocalStorage Persistence
+   Client State & Persistence
    ════════════════════════════════════════════════ */
 let currentUser = null;
 let currentAuthMode = 'signin';
-let sseConn = null, pollTmr = null;
+let sseConn = null, pollTmr = null, advanceTimer = null;
+let currentRunResult = null;
 
 const STORAGE_KEY_SETTINGS = "bugengine_settings_v4";
 const STORAGE_KEY_HISTORY  = "bugengine_history_v4";
@@ -637,33 +661,54 @@ function setModel(m) {
   document.getElementById('MODEL_NAME').value = m;
 }
 
-/* ════════ Tabs Navigation ════════ */
-function sw(n) {
-  ['run', 'targets', 'repos', 'queue', 'history'].forEach(t => {
-    document.getElementById(`t-${t}`).classList.toggle('on', t === n);
-    document.getElementById(`p-${t}`).classList.toggle('on', t === n);
-  });
-  if (n === 'history') loadHistory();
-  if (n === 'targets') loadTargets();
-  if (n === 'queue') loadQueue();
-  if (n === 'repos') loadRepos();
-}
-function acc(btn) {
-  btn.classList.toggle('op');
-  btn.nextElementSibling.classList.toggle('op');
-}
-
-/* ════════ Inspection Run with Step Visualizer ════════ */
-function updateTimeline(activeStep) {
+/* ════════ Stepper & Timelines ════════ */
+function updateTimeline(step) {
   for (let i = 1; i <= 4; i++) {
     const el = document.getElementById(`tls-${i}`);
     if (!el) continue;
     el.classList.remove('active', 'done');
-    if (i < activeStep) el.classList.add('done');
-    else if (i === activeStep) el.classList.add('active');
+    if (i < step) el.classList.add('done');
+    else if (i === step) el.classList.add('active');
   }
 }
 
+function showNextStepPrompt(title, desc, nextActionFn) {
+  const banner = document.getElementById('nextStepBanner');
+  document.getElementById('nextActionName').textContent = title;
+  document.getElementById('nextActionDesc').textContent = desc;
+  banner.classList.add('show');
+
+  let seconds = 8;
+  const timerEl = document.getElementById('autoAdvanceTimer');
+  timerEl.textContent = `Auto-proceeding in ${seconds}s...`;
+
+  if (advanceTimer) clearInterval(advanceTimer);
+  advanceTimer = setInterval(() => {
+    seconds--;
+    if (seconds > 0) {
+      timerEl.textContent = `Auto-proceeding in ${seconds}s...`;
+    } else {
+      clearInterval(advanceTimer);
+      banner.classList.remove('show');
+      nextActionFn();
+    }
+  }, 1000);
+}
+
+function approveNextStep() {
+  if (advanceTimer) clearInterval(advanceTimer);
+  document.getElementById('nextStepBanner').classList.remove('show');
+  appendLog("✓ User approved next action. Proceeding...", "ok");
+  updateTimeline(4);
+}
+
+function pauseNextStep() {
+  if (advanceTimer) clearInterval(advanceTimer);
+  document.getElementById('autoAdvanceTimer').textContent = "Paused by user";
+  appendLog("⏸ User paused pipeline auto-advance.", "info");
+}
+
+/* ════════ Inspection Run ════════ */
 async function startRun() {
   let url = document.getElementById('r-url').value.trim();
   if (!url) { alert('Please enter a target URL.'); return; }
@@ -686,6 +731,7 @@ async function startRun() {
   updateTimeline(1);
   document.getElementById('runBtn').disabled = true;
   document.getElementById('resSec').style.display = 'none';
+  document.getElementById('nextStepBanner').classList.remove('show');
 
   try {
     const res = await fetch('/api/run', {
@@ -711,9 +757,9 @@ function openSSE() {
     const d = JSON.parse(e.data);
     if (d.line) {
       appendLog(d.line);
-      if (d.line.includes('DOM') || d.line.includes('Inspecting')) updateTimeline(2);
-      if (d.line.includes('Repair') || d.line.includes('Fix')) updateTimeline(3);
-      if (d.line.includes('PR') || d.line.includes('Finished')) updateTimeline(4);
+      if (d.line.includes('DOM') || d.line.includes('Inspecting') || d.line.includes('200 OK')) updateTimeline(2);
+      if (d.line.includes('Repair') || d.line.includes('Fix') || d.line.includes('solution planned')) updateTimeline(3);
+      if (d.line.includes('Finished') || d.line.includes('Completed')) updateTimeline(4);
     }
     if (d.done) {
       sseConn.close();
@@ -744,7 +790,7 @@ function startPolling() {
 
 function onAuditDone(result) {
   document.getElementById('runBtn').disabled = false;
-  updateTimeline(4);
+  currentRunResult = result;
   if (!result) { setStatus('error', 'Error'); return; }
   setStatus(result.error && !result.bug_found ? 'error' : 'done', 'Done');
   
@@ -775,6 +821,21 @@ function onAuditDone(result) {
       <span>${esc(s)}</span>
     </div>
   `).join('');
+
+  // Auto-advance prompt to next step with user confirmation / countdown
+  if (result.bug_found) {
+    showNextStepPrompt(
+      "Review & Apply AI Code Repair",
+      "Defect identified. Ready to generate the localized patch in your connected repository.",
+      () => { updateTimeline(3); appendLog("🔧 Auto-proceeded to Step 3: AI Code Repair", "fix"); }
+    );
+  } else {
+    showNextStepPrompt(
+      "Save Target & Verification",
+      "Page verified healthy. Ready to save this target to your recurring monitoring list.",
+      () => { updateTimeline(4); appendLog("✅ Verification confirmed clean.", "ok"); }
+    );
+  }
 
   // Save to LocalStorage History
   const localHist = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || "[]");
@@ -817,6 +878,22 @@ function setStatus(cls, txt) {
   const b = document.getElementById('stBadge');
   b.className = 'status ' + cls;
   document.getElementById('stTxt').textContent = txt;
+}
+
+/* ════════ Tabs Navigation ════════ */
+function sw(n) {
+  ['run', 'targets', 'repos', 'queue', 'history'].forEach(t => {
+    document.getElementById(`t-${t}`).classList.toggle('on', t === n);
+    document.getElementById(`p-${t}`).classList.toggle('on', t === n);
+  });
+  if (n === 'history') loadHistory();
+  if (n === 'targets') loadTargets();
+  if (n === 'queue') loadQueue();
+  if (n === 'repos') loadRepos();
+}
+function acc(btn) {
+  btn.classList.toggle('op');
+  btn.nextElementSibling.classList.toggle('op');
 }
 
 /* ════════ Targets ════════ */
