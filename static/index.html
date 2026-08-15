@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Autonomous UI Bug Engine</title>
-  <meta name="description" content="AI-powered autonomous UI bug detection, scheduling, multi-repo code editor and auto-fix pipeline." />
+  <meta name="description" content="AI-powered autonomous UI bug detection, scheduling, multi-repo code editor and auto-fix pipeline powered by OpenRouter." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
@@ -24,7 +24,7 @@
     .app{display:flex;flex:1;height:100vh;overflow:hidden}
 
     /* Sidebar */
-    .sb{width:300px;min-width:260px;background:var(--bg1);border-right:1px solid var(--b);display:flex;flex-direction:column;overflow:hidden}
+    .sb{width:310px;min-width:270px;background:var(--bg1);border-right:1px solid var(--b);display:flex;flex-direction:column;overflow:hidden}
     .sb-head{padding:16px 18px 12px;border-bottom:1px solid var(--b);flex-shrink:0}
     .logo{display:flex;align-items:center;gap:10px}
     .logo-ic{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#63b3ed,#4299e1);display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 0 16px rgba(99,179,237,.25)}
@@ -47,11 +47,6 @@
     .ac-bd{padding:2px 3px 8px;display:none}
     .ac-bd.op{display:block}
 
-    /* Provider toggle */
-    .pvw{display:flex;gap:3px;background:var(--bg2);border:1px solid var(--b);border-radius:var(--r);padding:3px;margin-bottom:10px}
-    .pvb{flex:1;padding:5px;border-radius:7px;border:none;background:transparent;color:var(--td);font:500 11px 'Inter',sans-serif;cursor:pointer;transition:var(--tr)}
-    .pvb.on{background:var(--ac);color:#fff;box-shadow:0 2px 8px rgba(99,179,237,.28)}
-
     /* Fields */
     .f{margin-bottom:9px}
     .f label{display:block;font-size:10px;font-weight:500;color:var(--td);margin-bottom:4px}
@@ -61,6 +56,11 @@
     .f select{appearance:none;cursor:pointer}
     .f textarea{resize:vertical;min-height:60px}
     .fh{font-size:10px;color:var(--tm);margin-top:3px}
+
+    /* Quick Preset Chips */
+    .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+    .chip{font-size:10px;padding:2px 7px;border-radius:12px;background:var(--bg3);border:1px solid var(--b);color:var(--td);cursor:pointer;transition:var(--tr)}
+    .chip:hover{border-color:var(--ac);color:var(--tx)}
 
     /* ── Main ───────────────────────────────────────── */
     .mn{flex:1;display:flex;flex-direction:column;overflow:hidden}
@@ -85,7 +85,6 @@
     /* Cards */
     .card{background:var(--bg1);border:1px solid var(--b);border-radius:var(--rlg);padding:16px;margin-bottom:12px}
     .ct{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--td);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:6px}
-    .ct .ic{font-size:13px}
 
     /* Buttons */
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 14px;border-radius:var(--r);border:none;font:600 12px 'Inter',sans-serif;cursor:pointer;transition:var(--tr)}
@@ -246,48 +245,36 @@
   </div>
   <div class="sb-sc">
 
-    <!-- LLM -->
+    <!-- OpenRouter LLM Config -->
     <div class="ac">
-      <button class="ac-hd op" onclick="acc(this)"><span>⚡ LLM Provider</span><span class="ch">▼</span></button>
+      <button class="ac-hd op" onclick="acc(this)"><span>⚡ OpenRouter LLM</span><span class="ch">▼</span></button>
       <div class="ac-bd op">
-        <div class="pvw">
-          <button class="pvb on" id="pb-or" onclick="setProv('openrouter')">OpenRouter</button>
-          <button class="pvb"    id="pb-bd" onclick="setProv('bedrock')">AWS Bedrock</button>
+        <div class="f">
+          <label>OpenRouter API Key</label>
+          <input type="password" id="OPENROUTER_API_KEY" placeholder="sk-or-v1-…" autocomplete="off"/>
+          <div class="fh">Get key from <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--ac)">openrouter.ai/keys</a></div>
         </div>
-        <div id="or-f">
-          <div class="f"><label>API Key</label><input type="password" id="OPENROUTER_API_KEY" placeholder="sk-or-v1-…" autocomplete="off"/><div class="fh">openrouter.ai/keys</div></div>
-          <div class="f"><label>Model</label>
-            <select id="MODEL_NAME">
-              <option value="x-ai/grok-4">xAI Grok-4</option>
-              <option value="x-ai/grok-3">xAI Grok-3</option>
-              <option value="openai/gpt-4o">GPT-4o</option>
-              <option value="openai/gpt-4o-mini">GPT-4o mini</option>
-              <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-              <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
-              <option value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B</option>
-              <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
-            </select>
+        
+        <div class="f">
+          <label>Model ID (Any Model on OpenRouter)</label>
+          <input type="text" id="MODEL_NAME" placeholder="e.g. x-ai/grok-4, anthropic/claude-3.7-sonnet" />
+          <div class="fh">Type ANY model slug from <a href="https://openrouter.ai/models" target="_blank" style="color:var(--ac)">openrouter.ai/models</a></div>
+          <div class="chips">
+            <span class="chip" onclick="setModel('x-ai/grok-4')">xAI Grok-4</span>
+            <span class="chip" onclick="setModel('x-ai/grok-3')">xAI Grok-3</span>
+            <span class="chip" onclick="setModel('anthropic/claude-3.7-sonnet')">Claude 3.7</span>
+            <span class="chip" onclick="setModel('anthropic/claude-3.5-sonnet')">Claude 3.5</span>
+            <span class="chip" onclick="setModel('openai/gpt-4o')">GPT-4o</span>
+            <span class="chip" onclick="setModel('openai/gpt-4o-mini')">GPT-4o mini</span>
+            <span class="chip" onclick="setModel('meta-llama/llama-3.3-70b-instruct')">Llama 3.3 70B</span>
+            <span class="chip" onclick="setModel('google/gemini-2.0-flash-001')">Gemini 2.0 Flash</span>
+            <span class="chip" onclick="setModel('deepseek/deepseek-r1')">DeepSeek R1</span>
           </div>
         </div>
-        <div id="bd-f" style="display:none">
-          <div class="f"><label>AWS Access Key ID</label><input type="password" id="AWS_ACCESS_KEY_ID" placeholder="AKIA…" autocomplete="off"/></div>
-          <div class="f"><label>AWS Secret Access Key</label><input type="password" id="AWS_SECRET_ACCESS_KEY" placeholder="secret…" autocomplete="off"/></div>
-          <div class="f"><label>Region</label>
-            <select id="AWS_REGION">
-              <option value="us-east-1">us-east-1</option><option value="us-west-2">us-west-2</option>
-              <option value="eu-west-1">eu-west-1</option><option value="ap-southeast-1">ap-southeast-1</option>
-            </select>
-          </div>
-          <div class="f"><label>Bedrock Model</label>
-            <select id="BEDROCK_MODEL_ID">
-              <option value="anthropic.claude-3-5-sonnet-20241022-v2:0">Claude 3.5 Sonnet v2</option>
-              <option value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku</option>
-              <option value="meta.llama3-3-70b-instruct-v1:0">Llama 3.3 70B</option>
-              <option value="amazon.nova-pro-v1:0">Nova Pro</option>
-              <option value="amazon.nova-lite-v1:0">Nova Lite</option>
-            </select>
-            <div class="fh">⚠ Grok is on OpenRouter, not Bedrock.</div>
-          </div>
+
+        <div class="f">
+          <label>Base URL</label>
+          <input type="text" id="OPENROUTER_BASE_URL" value="https://openrouter.ai/api/v1" />
         </div>
         <div class="f"><label>Temperature</label><input type="number" id="LLM_TEMPERATURE" value="0.0" min="0" max="2" step="0.1"/></div>
         <div class="f"><label>Max Tokens</label><input type="number" id="LLM_MAX_TOKENS" value="4096" min="256" step="256"/></div>
@@ -299,7 +286,7 @@
       <button class="ac-hd" onclick="acc(this)"><span>🐙 GitHub</span><span class="ch">▼</span></button>
       <div class="ac-bd">
         <div class="f"><label>Personal Access Token</label><input type="password" id="GITHUB_TOKEN" placeholder="github_pat_…" autocomplete="off"/><div class="fh">Contents (rw) + Pull Requests (rw)</div></div>
-        <div class="f"><label>Default Repository</label><input type="text" id="REPO_NAME" placeholder="owner/repo"/></div>
+        <div class="f"><label>Default Repository</label><input type="text" id="REPO_NAME" placeholder="KashinathTilagul/autonomous-engine"/></div>
         <div class="f"><label>Base Branch</label><input type="text" id="GITHUB_BASE_BRANCH" value="main"/></div>
       </div>
     </div>
@@ -400,7 +387,7 @@
       <div id="tgList"><div class="empty-state"><div class="em-ic">🎯</div>No targets yet. Add a URL to audit.</div></div>
     </div>
 
-    <!-- Add/Edit Target form (hidden by default) -->
+    <!-- Add/Edit Target form -->
     <div class="card" id="tgForm" style="display:none">
       <div class="ct"><span id="tgFormTitle">➕ Add Target</span></div>
       <input type="hidden" id="tg-edit-id"/>
@@ -452,7 +439,7 @@
         <div class="repo-body" id="repoBody">
           <div class="no-repo"><span style="font-size:36px">📁</span><span>Select a repository from the left to browse its files.</span></div>
         </div>
-        <!-- Git bar (hidden until repo selected) -->
+        <!-- Git bar -->
         <div class="git-bar" id="gitBar" style="display:none">
           <input class="git-msg" id="git-msg" value="chore: edit via Bug Engine UI" placeholder="Commit message…"/>
           <button class="btn btn-g btn-sm" onclick="gitOp('status')">Status</button>
@@ -561,7 +548,7 @@
 
 <script>
 /* ════════ State ════════ */
-let prov='openrouter', sMode='interval', sseConn=null, pollTmr=null;
+let sMode='interval', sseConn=null, pollTmr=null;
 let notifOk=false;
 let activeRepo=null, curPath='.', openFile=null;
 
@@ -588,32 +575,27 @@ function sw(n){
 /* ════════ Accordion ════════ */
 function acc(btn){btn.classList.toggle('op');btn.nextElementSibling.classList.toggle('op')}
 
-/* ════════ Provider ════════ */
-function setProv(p){
-  prov=p;
-  document.getElementById('pb-or').classList.toggle('on',p==='openrouter');
-  document.getElementById('pb-bd').classList.toggle('on',p==='bedrock');
-  document.getElementById('or-f').style.display=p==='openrouter'?'':'none';
-  document.getElementById('bd-f').style.display=p==='bedrock'?'':'none';
+/* ════════ Set Model Helper ════════ */
+function setModel(m){
+  document.getElementById('MODEL_NAME').value = m;
 }
 
 /* ════════ Settings ════════ */
 async function loadSettings(){
   try{
     const d=await fetch('/api/settings').then(r=>r.json());
-    ['OPENROUTER_API_KEY','MODEL_NAME','LLM_TEMPERATURE','LLM_MAX_TOKENS','OPENHANDS_API_URL',
-     'OPENHANDS_API_KEY','OPENHANDS_TIMEOUT_SECONDS','GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH',
-     'BROWSER_MAX_STEPS','LOG_LEVEL','AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_REGION','BEDROCK_MODEL_ID']
+    ['OPENROUTER_API_KEY','MODEL_NAME','OPENROUTER_BASE_URL','LLM_TEMPERATURE','LLM_MAX_TOKENS',
+     'OPENHANDS_API_URL','OPENHANDS_API_KEY','OPENHANDS_TIMEOUT_SECONDS',
+     'GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH',
+     'BROWSER_MAX_STEPS','LOG_LEVEL']
     .forEach(k=>{const el=document.getElementById(k);if(el&&d[k])el.value=d[k];});
-    setProv(d.LLM_PROVIDER||'openrouter');
   }catch(e){console.warn(e)}
 }
 async function saveSettings(){
   const btn=document.getElementById('svBtn');
   btn.disabled=true; btn.textContent='Saving…';
-  const p={LLM_PROVIDER:prov};
+  const p={};
   ['OPENROUTER_API_KEY','MODEL_NAME','OPENROUTER_BASE_URL','LLM_TEMPERATURE','LLM_MAX_TOKENS',
-   'AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_REGION','BEDROCK_MODEL_ID',
    'OPENHANDS_API_URL','OPENHANDS_API_KEY','OPENHANDS_TIMEOUT_SECONDS',
    'GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH','BROWSER_MAX_STEPS','LOG_LEVEL']
   .forEach(k=>{const el=document.getElementById(k);if(el)p[k]=el.value;});
@@ -840,17 +822,15 @@ async function openFileEditor(path){
   if(!activeRepo)return;openFile=path;
   try{
     const d=await fetch(`/api/repos/${activeRepo.id}/file?path=${encodeURIComponent(path)}`).then(r=>r.json());
-    // highlight active file
     document.querySelectorAll('.fe').forEach(el=>el.classList.remove('on'));
     document.querySelectorAll('.fe').forEach(el=>{if(el.querySelector('.fe-nm')?.textContent===path.split('/').pop())el.classList.add('on');});
     renderEditor(d.binary?'(binary file — cannot edit)':d.content||'', path, d.binary?'binary':'', d);
   }catch(e){console.error(e)}
 }
 function renderEditor(content,path,hint,meta){
-  // find or create editor area
   let ea=document.querySelector('.editor-area');
   if(!ea){ea=document.createElement('div');ea.className='editor-area';document.getElementById('repoBody').appendChild(ea);}
-  const fname=path.split('/').pop();const ext=(fname.includes('.')?fname.split('.').pop():'').toLowerCase();
+  const fname=path.split('/').pop();
   const lines=meta?.lines||content.split('\n').length;const sz=meta?.size?fmt(meta.size):'';
   ea.innerHTML=`
     <div class="editor-hd">
@@ -859,7 +839,6 @@ function renderEditor(content,path,hint,meta){
       <button class="btn btn-p btn-sm" onclick="saveFile()">💾 Save</button>
     </div>
     <textarea class="editor" id="codeEditor" spellcheck="false">${esc(content)}</textarea>`;
-  // tab key support
   document.getElementById('codeEditor').addEventListener('keydown',e=>{
     if(e.key==='Tab'){e.preventDefault();const t=e.target,s=t.selectionStart,en=t.selectionEnd;
       t.value=t.value.substring(0,s)+'  '+t.value.substring(en);t.selectionStart=t.selectionEnd=s+2;}

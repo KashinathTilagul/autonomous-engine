@@ -3,6 +3,7 @@ server.py  ·  Autonomous UI Bug Engine
 ─────────────────────────────────────────────────────────────────────────────
 FastAPI web server – Settings, Pipeline, Scheduler, Queue, History,
 Target URL Manager, and Repo Manager with inline file editor.
+Exclusively powered by OpenRouter for all LLM interactions.
 
 Endpoints
 ─────────
@@ -80,7 +81,7 @@ TARGETS_FILE  = BASE_DIR / ".targets.json"
 REPOS_FILE    = BASE_DIR / ".repos.json"
 
 # ── app ───────────────────────────────────────────────────────────────────────
-app = FastAPI(title="Autonomous UI Bug Engine", version="3.0.0")
+app = FastAPI(title="Autonomous UI Bug Engine", version="3.1.0")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 scheduler = AsyncIOScheduler()
@@ -92,7 +93,6 @@ _run_state: dict[str, Any] = {
 # ── sensitive keys ────────────────────────────────────────────────────────────
 _SENSITIVE = {
     "OPENROUTER_API_KEY", "GITHUB_TOKEN", "OPENHANDS_API_KEY",
-    "AWS_ACCESS_KEY_ID",  "AWS_SECRET_ACCESS_KEY",
 }
 _MASKED_RE = re.compile(r"^[•]+$")
 
@@ -161,26 +161,27 @@ async def get_settings() -> dict:
     env = _read_env()
     masked = {k: _mask(k, v) for k, v in env.items()}
     defaults = {
-        "LLM_PROVIDER": "openrouter", "MODEL_NAME": "x-ai/grok-4",
+        "OPENROUTER_API_KEY": "",
+        "MODEL_NAME": "x-ai/grok-4",
         "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1",
-        "LLM_TEMPERATURE": "0.0", "LLM_MAX_TOKENS": "4096",
+        "LLM_TEMPERATURE": "0.0",
+        "LLM_MAX_TOKENS": "4096",
         "OPENHANDS_API_URL": "http://localhost:3000",
+        "OPENHANDS_API_KEY": "",
         "OPENHANDS_TIMEOUT_SECONDS": "600",
-        "GITHUB_BASE_BRANCH": "main", "BROWSER_MAX_STEPS": "25",
-        "LOG_LEVEL": "INFO", "AWS_REGION": "us-east-1",
+        "GITHUB_TOKEN": "",
+        "REPO_NAME": "KashinathTilagul/autonomous-engine",
+        "GITHUB_BASE_BRANCH": "main",
+        "BROWSER_MAX_STEPS": "25",
+        "LOG_LEVEL": "INFO",
     }
     return {**defaults, **masked}
 
 
 class SettingsPayload(BaseModel):
-    LLM_PROVIDER: str = "openrouter"
     OPENROUTER_API_KEY: str = ""
     MODEL_NAME: str = "x-ai/grok-4"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-    AWS_ACCESS_KEY_ID: str = ""
-    AWS_SECRET_ACCESS_KEY: str = ""
-    AWS_REGION: str = "us-east-1"
-    BEDROCK_MODEL_ID: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
     LLM_TEMPERATURE: str = "0.0"
     LLM_MAX_TOKENS: str = "4096"
     OPENHANDS_API_URL: str = "http://localhost:3000"
@@ -490,7 +491,6 @@ async def repo_tree(repo_id: str, path: str = Query(".")) -> dict:
     base = Path(repo["local_path"])
     target = (base / path).resolve()
 
-    # Safety: must stay inside repo root
     if not str(target).startswith(str(base.resolve())):
         raise HTTPException(403, "Access denied.")
     if not target.exists():
@@ -569,7 +569,7 @@ async def git_op(repo_id: str, payload: GitOpPayload) -> dict:
         "diff":   ["git", "diff", "--stat"],
         "pull":   ["git", "pull"],
         "push":   ["git", "push"],
-        "commit": ["git", "add", "--all"],   # we do add + commit in sequence
+        "commit": ["git", "add", "--all"],
     }
 
     if payload.op not in cmd_map:
@@ -636,7 +636,6 @@ async def _execute_pipeline(payload: RunPayload, run_id: str) -> None:
         if result.get("error"):    _log(f"❌ {result['error']}")
         _run_state.update({"result": result, "status": "done"})
         _append_history(result)
-        # Update last_run on matching target
         _update_target_last_run(payload.url, result)
         _log("🏁 Done.")
     except Exception as exc:

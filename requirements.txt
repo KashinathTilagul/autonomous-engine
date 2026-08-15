@@ -3,14 +3,10 @@
 #  requirements.txt
 # ──────────────────────────────────────────────
 
-# LLM / AI
+# LLM / AI (OpenRouter via OpenAI-compatible interface)
 langchain-openai>=0.2.0
 langchain>=0.3.0
 langchain-core>=0.3.0
-
-# Amazon Bedrock support
-langchain-aws>=0.2.0
-boto3>=1.34.0
 
 # Headless browser automation (QA "Eyes")
 browser-use>=0.1.40
