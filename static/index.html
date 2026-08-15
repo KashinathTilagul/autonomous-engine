@@ -4,1031 +4,1003 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Autonomous UI Bug Engine</title>
-  <meta name="description" content="AI-powered autonomous UI bug detection, scheduling, queuing and auto-fix with GitHub PRs." />
+  <meta name="description" content="AI-powered autonomous UI bug detection, scheduling, multi-repo code editor and auto-fix pipeline." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:         #0c0e14;
-      --bg-1:       #131620;
-      --bg-2:       #1a1e2e;
-      --bg-3:       #222840;
-      --border:     rgba(255,255,255,.07);
-      --border-hi:  rgba(99,179,237,.3);
-      --text:       #e2e8f0;
-      --text-dim:   #7a869a;
-      --text-muted: #4a5568;
-      --accent:     #63b3ed;
-      --accent-g:   rgba(99,179,237,.14);
-      --green:      #48bb78;
-      --red:        #fc8181;
-      --yellow:     #f6e05e;
-      --orange:     #f6ad55;
-      --purple:     #b794f4;
-      --r:          10px;
-      --r-lg:       16px;
-      --tr:         all .17s cubic-bezier(.4,0,.2,1);
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0c0e14;--bg1:#131620;--bg2:#1a1e2e;--bg3:#222840;--bg4:#2a3050;
+      --b:rgba(255,255,255,.07);--bhi:rgba(99,179,237,.3);
+      --tx:#e2e8f0;--td:#7a869a;--tm:#4a5568;
+      --ac:#63b3ed;--ag:rgba(99,179,237,.13);
+      --gr:#48bb78;--rd:#fc8181;--yl:#f6e05e;--or:#f6ad55;--pu:#b794f4;
+      --r:10px;--rlg:16px;--tr:all .16s cubic-bezier(.4,0,.2,1);
     }
+    html,body{height:100%;font-size:14px;line-height:1.6}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);display:flex;flex-direction:column}
 
-    html, body { height: 100%; font-size: 14px; line-height: 1.6; }
-    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
-
-    /* ── Layout ──────────────────────────────────────── */
-    .app { display: flex; flex: 1; height: 100vh; overflow: hidden; }
+    /* ── Layout ─────────────────────────────────────── */
+    .app{display:flex;flex:1;height:100vh;overflow:hidden}
 
     /* Sidebar */
-    .sidebar {
-      width: 320px; min-width: 280px;
-      background: var(--bg-1);
-      border-right: 1px solid var(--border);
-      display: flex; flex-direction: column; overflow: hidden;
-    }
-    .sidebar-head {
-      padding: 18px 20px 14px;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .logo { display: flex; align-items: center; gap: 10px; }
-    .logo-icon {
-      width: 32px; height: 32px; border-radius: 8px;
-      background: linear-gradient(135deg, #63b3ed 0%, #4299e1 100%);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 15px; box-shadow: 0 0 18px rgba(99,179,237,.28);
-    }
-    .logo-name { font-size: 14px; font-weight: 700; letter-spacing: -.3px; }
-    .logo-sub  { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
-    .sidebar-scroll { flex: 1; overflow-y: auto; padding: 14px; }
-    .sidebar-scroll::-webkit-scrollbar { width: 3px; }
-    .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
-    .sidebar-foot {
-      padding: 12px 14px; border-top: 1px solid var(--border);
-      flex-shrink: 0; display: flex; flex-direction: column; gap: 7px;
-    }
-    .save-note { font-size: 11px; color: var(--green); text-align: center; height: 14px; opacity: 0; transition: opacity .3s; }
-    .save-note.show { opacity: 1; }
+    .sb{width:300px;min-width:260px;background:var(--bg1);border-right:1px solid var(--b);display:flex;flex-direction:column;overflow:hidden}
+    .sb-head{padding:16px 18px 12px;border-bottom:1px solid var(--b);flex-shrink:0}
+    .logo{display:flex;align-items:center;gap:10px}
+    .logo-ic{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#63b3ed,#4299e1);display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 0 16px rgba(99,179,237,.25)}
+    .logo-nm{font-size:13px;font-weight:700;letter-spacing:-.3px}
+    .logo-sb{font-size:10px;color:var(--td);margin-top:1px}
+    .sb-sc{flex:1;overflow-y:auto;padding:12px}
+    .sb-sc::-webkit-scrollbar{width:3px}
+    .sb-sc::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px}
+    .sb-ft{padding:10px 12px;border-top:1px solid var(--b);flex-shrink:0;display:flex;flex-direction:column;gap:6px}
+    .sv-note{font-size:11px;color:var(--gr);text-align:center;height:13px;opacity:0;transition:opacity .3s}
+    .sv-note.show{opacity:1}
 
     /* Accordion */
-    .acc { margin-bottom: 3px; }
-    .acc-hd {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 9px 11px; border-radius: var(--r);
-      cursor: pointer; width: 100%; background: transparent; border: none;
-      font: 600 11px/1 'Inter', sans-serif; text-transform: uppercase; letter-spacing: .07em;
-      color: var(--text-dim); transition: var(--tr);
-    }
-    .acc-hd:hover { background: var(--bg-2); color: var(--text); }
-    .acc-hd.open  { color: var(--accent); }
-    .acc-hd .ch { transition: transform .2s; font-size: 9px; }
-    .acc-hd.open .ch { transform: rotate(180deg); }
-    .acc-bd { padding: 2px 4px 10px; display: none; }
-    .acc-bd.open { display: block; }
+    .ac{margin-bottom:2px}
+    .ac-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:var(--r);cursor:pointer;width:100%;background:transparent;border:none;font:600 10px/1 'Inter',sans-serif;text-transform:uppercase;letter-spacing:.07em;color:var(--td);transition:var(--tr)}
+    .ac-hd:hover{background:var(--bg2);color:var(--tx)}
+    .ac-hd.op{color:var(--ac)}
+    .ac-hd .ch{transition:transform .2s;font-size:9px}
+    .ac-hd.op .ch{transform:rotate(180deg)}
+    .ac-bd{padding:2px 3px 8px;display:none}
+    .ac-bd.op{display:block}
 
     /* Provider toggle */
-    .prov-wrap { display: flex; gap: 3px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r); padding: 3px; margin-bottom: 12px; }
-    .prov-btn { flex: 1; padding: 6px; border-radius: 7px; border: none; background: transparent; color: var(--text-dim); font: 500 12px 'Inter',sans-serif; cursor: pointer; transition: var(--tr); }
-    .prov-btn.on { background: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(99,179,237,.3); }
+    .pvw{display:flex;gap:3px;background:var(--bg2);border:1px solid var(--b);border-radius:var(--r);padding:3px;margin-bottom:10px}
+    .pvb{flex:1;padding:5px;border-radius:7px;border:none;background:transparent;color:var(--td);font:500 11px 'Inter',sans-serif;cursor:pointer;transition:var(--tr)}
+    .pvb.on{background:var(--ac);color:#fff;box-shadow:0 2px 8px rgba(99,179,237,.28)}
 
     /* Fields */
-    .f { margin-bottom: 10px; }
-    .f label { display: block; font-size: 11px; font-weight: 500; color: var(--text-dim); margin-bottom: 4px; }
-    .f input, .f select, .f textarea {
-      width: 100%; background: var(--bg-2); border: 1px solid var(--border);
-      border-radius: var(--r); color: var(--text); font-family: inherit; font-size: 13px;
-      padding: 7px 10px; outline: none; transition: var(--tr);
-    }
-    .f input:focus, .f select:focus, .f textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-g); }
-    .f input[type=password] { font-family: 'JetBrains Mono',monospace; letter-spacing: .12em; }
-    .f select { appearance: none; cursor: pointer; }
-    .f textarea { resize: vertical; min-height: 72px; }
-    .f-hint { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+    .f{margin-bottom:9px}
+    .f label{display:block;font-size:10px;font-weight:500;color:var(--td);margin-bottom:4px}
+    .f input,.f select,.f textarea{width:100%;background:var(--bg2);border:1px solid var(--b);border-radius:var(--r);color:var(--tx);font-family:inherit;font-size:12px;padding:6px 9px;outline:none;transition:var(--tr)}
+    .f input:focus,.f select:focus,.f textarea:focus{border-color:var(--ac);box-shadow:0 0 0 3px var(--ag)}
+    .f input[type=password]{font-family:'JetBrains Mono',monospace;letter-spacing:.1em}
+    .f select{appearance:none;cursor:pointer}
+    .f textarea{resize:vertical;min-height:60px}
+    .fh{font-size:10px;color:var(--tm);margin-top:3px}
 
-    /* ── Main ────────────────────────────────────────── */
-    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    /* ── Main ───────────────────────────────────────── */
+    .mn{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .tb{padding:0 20px;height:48px;background:var(--bg1);border-bottom:1px solid var(--b);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+    .tabs{display:flex;gap:2px}
+    .tab{padding:5px 12px;border-radius:7px;border:none;background:transparent;color:var(--td);font:500 12px 'Inter',sans-serif;cursor:pointer;transition:var(--tr)}
+    .tab:hover{color:var(--tx);background:var(--bg2)}
+    .tab.on{background:var(--ag);color:var(--ac)}
+    .status{display:flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;font-size:11px;font-weight:500;background:var(--bg2);border:1px solid var(--b);transition:var(--tr)}
+    .dot{width:6px;height:6px;border-radius:50%;background:var(--tm)}
+    .status.running .dot{background:var(--ac);animation:blink 1.2s infinite}
+    .status.done .dot{background:var(--gr)}
+    .status.error .dot{background:var(--rd)}
+    .status.sched .dot{background:var(--pu);animation:blink 2s infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
-    /* Topbar */
-    .topbar {
-      padding: 0 24px; height: 52px;
-      background: var(--bg-1); border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
-    }
-
-    /* Tab nav */
-    .tabs { display: flex; gap: 2px; }
-    .tab {
-      padding: 6px 14px; border-radius: 7px; border: none;
-      background: transparent; color: var(--text-dim); font: 500 13px 'Inter',sans-serif;
-      cursor: pointer; transition: var(--tr);
-    }
-    .tab:hover { color: var(--text); background: var(--bg-2); }
-    .tab.on { background: var(--accent-g); color: var(--accent); }
-
-    /* Status */
-    .status {
-      display: flex; align-items: center; gap: 6px;
-      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
-      background: var(--bg-2); border: 1px solid var(--border); transition: var(--tr);
-    }
-    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
-    .status.running .dot { background: var(--accent); animation: blink 1.2s infinite; }
-    .status.done    .dot { background: var(--green); }
-    .status.error   .dot { background: var(--red); }
-    .status.scheduled .dot { background: var(--purple); animation: blink 2s infinite; }
-    @keyframes blink { 0%,100%{opacity:1}50%{opacity:.35} }
-
-    /* Tab panels */
-    .panel { flex: 1; overflow-y: auto; padding: 22px 24px; display: none; }
-    .panel.on { display: block; }
-    .panel::-webkit-scrollbar { width: 4px; }
-    .panel::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
+    .panel{flex:1;overflow-y:auto;padding:20px;display:none}
+    .panel.on{display:block}
+    .panel::-webkit-scrollbar{width:4px}
+    .panel::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:4px}
 
     /* Cards */
-    .card { background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px; margin-bottom: 14px; }
-    .card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); margin-bottom: 14px; display: flex; align-items: center; gap: 7px; }
+    .card{background:var(--bg1);border:1px solid var(--b);border-radius:var(--rlg);padding:16px;margin-bottom:12px}
+    .ct{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--td);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+    .ct .ic{font-size:13px}
 
     /* Buttons */
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px; border-radius: var(--r); border: none; font: 600 13px 'Inter',sans-serif; cursor: pointer; transition: var(--tr); }
-    .btn-p { background: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(99,179,237,.25); }
-    .btn-p:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    .btn-p:active { transform: none; }
-    .btn-p:disabled { opacity: .45; cursor: not-allowed; transform: none; }
-    .btn-g { background: var(--bg-2); color: var(--text-dim); border: 1px solid var(--border); }
-    .btn-g:hover { background: var(--bg-3); color: var(--text); }
-    .btn-danger { background: rgba(252,129,129,.12); color: var(--red); border: 1px solid rgba(252,129,129,.2); }
-    .btn-sm { padding: 5px 11px; font-size: 12px; }
-    .btn-full { width: 100%; }
-    .btn-green { background: rgba(72,187,120,.15); color: var(--green); border: 1px solid rgba(72,187,120,.2); }
-
-    /* Run panel */
-    .run-grid { display: flex; flex-direction: column; gap: 12px; }
-    .run-row { display: flex; gap: 10px; }
-    .run-row .f { flex: 1; margin: 0; }
-    .run-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .check-group { display: flex; gap: 14px; }
-    .check-lbl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
-    .check-lbl input { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; }
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 14px;border-radius:var(--r);border:none;font:600 12px 'Inter',sans-serif;cursor:pointer;transition:var(--tr)}
+    .btn-p{background:var(--ac);color:#fff;box-shadow:0 2px 8px rgba(99,179,237,.22)}
+    .btn-p:hover{filter:brightness(1.1);transform:translateY(-1px)}
+    .btn-p:active{transform:none}
+    .btn-p:disabled{opacity:.45;cursor:not-allowed;transform:none}
+    .btn-g{background:var(--bg2);color:var(--td);border:1px solid var(--b)}
+    .btn-g:hover{background:var(--bg3);color:var(--tx)}
+    .btn-rd{background:rgba(252,129,129,.1);color:var(--rd);border:1px solid rgba(252,129,129,.18)}
+    .btn-gr{background:rgba(72,187,120,.12);color:var(--gr);border:1px solid rgba(72,187,120,.2)}
+    .btn-sm{padding:4px 10px;font-size:11px}
+    .btn-full{width:100%}
 
     /* Console */
-    .console { background: #090b10; border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
-    .con-head { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; border-bottom: 1px solid var(--border); background: var(--bg-1); }
-    .con-dots { display: flex; gap: 5px; }
-    .con-dots span { width: 10px; height: 10px; border-radius: 50%; }
-    .cd-r{background:#ff5f57}.cd-y{background:#febc2e}.cd-g{background:#28c840}
-    .con-title { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .07em; }
-    .con-body { height: 280px; overflow-y: auto; padding: 12px 14px; font-family: 'JetBrains Mono',monospace; font-size: 12px; line-height: 1.75; }
-    .con-body::-webkit-scrollbar { width: 3px; }
-    .con-body::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
-    .ll { color: #7a8a9a; }
-    .ll.bug{color:var(--red)}.ll.fix{color:var(--yellow)}.ll.ok{color:var(--green)}.ll.info{color:var(--accent)}.ll.muted{color:var(--text-muted);font-style:italic}
+    .con{background:#090b10;border:1px solid var(--b);border-radius:var(--rlg);overflow:hidden}
+    .con-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 13px;border-bottom:1px solid var(--b);background:var(--bg1)}
+    .cdots{display:flex;gap:5px}
+    .cdots span{width:10px;height:10px;border-radius:50%}
+    .cr{background:#ff5f57}.cy{background:#febc2e}.cg{background:#28c840}
+    .con-ti{font-size:10px;font-weight:600;color:var(--td);text-transform:uppercase;letter-spacing:.07em}
+    .con-bd{height:260px;overflow-y:auto;padding:10px 13px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.75}
+    .con-bd::-webkit-scrollbar{width:3px}
+    .con-bd::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px}
+    .ll{color:#7a8a9a}
+    .ll.bug{color:var(--rd)}.ll.fix{color:var(--yl)}.ll.ok{color:var(--gr)}.ll.info{color:var(--ac)}.ll.mt{color:var(--tm);font-style:italic}
 
-    /* Result strip */
-    .res-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
-    .res-card { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; }
-    .rc-lbl { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 5px; }
-    .rc-val { font-size: 18px; font-weight: 700; }
-    .c-green{color:var(--green)}.c-red{color:var(--red)}.c-dim{color:var(--text-dim)}
+    /* Result */
+    .rg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+    .rc{background:var(--bg2);border:1px solid var(--b);border-radius:var(--r);padding:11px 13px}
+    .rl{font-size:10px;color:var(--tm);font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+    .rv{font-size:17px;font-weight:700}
+    .cgr{color:var(--gr)}.crd{color:var(--rd)}.cdm{color:var(--td)}
 
-    .pr-link { display: flex; align-items: center; gap: 8px; padding: 9px 13px; background: var(--bg-2); border: 1px solid var(--border-hi); border-radius: var(--r); margin-top: 10px; font-size: 12px; color: var(--accent); text-decoration: none; word-break: break-all; }
-    .pr-link:hover { background: var(--accent-g); }
+    /* Severity */
+    .sev{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
+    .sev-critical{background:rgba(252,129,129,.2);color:var(--rd)}
+    .sev-high{background:rgba(246,173,85,.2);color:var(--or)}
+    .sev-medium{background:rgba(246,224,94,.2);color:var(--yl)}
+    .sev-low{background:rgba(99,179,237,.15);color:var(--ac)}
+    .sev-none{background:rgba(72,187,120,.15);color:var(--gr)}
 
-    /* Severity badges */
-    .sev { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
-    .sev-critical{background:rgba(252,129,129,.2);color:var(--red)}
-    .sev-high{background:rgba(246,173,85,.2);color:var(--orange)}
-    .sev-medium{background:rgba(246,224,94,.2);color:var(--yellow)}
-    .sev-low{background:rgba(99,179,237,.15);color:var(--accent)}
-    .sev-none{background:rgba(72,187,120,.15);color:var(--green)}
+    /* Run panel rows */
+    .rr{display:flex;gap:10px}
+    .rr .f{flex:1;margin:0}
+    .ract{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .ck{display:flex;gap:12px}
+    .ck label{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--td);cursor:pointer}
+    .ck input[type=checkbox]{width:13px;height:13px;accent-color:var(--ac)}
+    .pr-link{display:flex;align-items:center;gap:7px;padding:8px 12px;background:var(--bg2);border:1px solid var(--bhi);border-radius:var(--r);margin-top:10px;font-size:11px;color:var(--ac);text-decoration:none;word-break:break-all}
+    .pr-link:hover{background:var(--ag)}
 
-    /* ── Automate tab ─────────────────────────────────── */
-    .mode-tabs { display: flex; gap: 3px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r); padding: 3px; margin-bottom: 16px; }
-    .mode-btn { flex: 1; padding: 7px; border-radius: 7px; border: none; background: transparent; color: var(--text-dim); font: 500 12px 'Inter',sans-serif; cursor: pointer; transition: var(--tr); text-align: center; }
-    .mode-btn.on { background: var(--accent); color: #fff; box-shadow: 0 1px 8px rgba(99,179,237,.3); }
+    /* Automate */
+    .mtabs{display:flex;gap:3px;background:var(--bg2);border:1px solid var(--b);border-radius:var(--r);padding:3px;margin-bottom:14px}
+    .mtab{flex:1;padding:6px;border-radius:7px;border:none;background:transparent;color:var(--td);font:500 11px 'Inter',sans-serif;cursor:pointer;transition:var(--tr);text-align:center}
+    .mtab.on{background:var(--ac);color:#fff;box-shadow:0 1px 6px rgba(99,179,237,.28)}
+    .presets{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+    .pb{padding:3px 10px;border-radius:20px;border:1px solid var(--b);background:var(--bg2);color:var(--td);font-size:10px;font-weight:500;cursor:pointer;transition:var(--tr)}
+    .pb:hover{border-color:var(--ac);color:var(--ac)}
+    .pb.on{background:var(--ag);border-color:var(--ac);color:var(--ac)}
+    .sched-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(183,148,244,.08);border:1px solid rgba(183,148,244,.2);border-radius:var(--r);font-size:11px;color:var(--pu);margin-bottom:12px}
 
-    .sched-info { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: rgba(183,148,244,.08); border: 1px solid rgba(183,148,244,.2); border-radius: var(--r); font-size: 12px; color: var(--purple); margin-bottom: 14px; }
+    /* Targets */
+    .tg-list{display:flex;flex-direction:column;gap:8px}
+    .tg-item{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;background:var(--bg2);border:1px solid var(--b);border-radius:var(--r);transition:var(--tr)}
+    .tg-item:hover{border-color:var(--bhi)}
+    .tg-lz{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
+    .lz-none{background:var(--tm)}.lz-ok{background:var(--gr)}.lz-bug{background:var(--rd)}.lz-med{background:var(--yl)}
+    .tg-body{flex:1;min-width:0}
+    .tg-name{font-size:13px;font-weight:600;margin-bottom:2px}
+    .tg-url{font-size:11px;color:var(--td);word-break:break-all;margin-bottom:3px}
+    .tg-meta{font-size:10px;color:var(--tm)}
+    .tg-acts{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+    .empty-state{text-align:center;padding:36px 20px;color:var(--tm);font-size:12px}
+    .empty-state .em-ic{font-size:32px;margin-bottom:10px}
 
-    .interval-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-    .preset-btn { padding: 4px 11px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text-dim); font-size: 11px; font-weight: 500; cursor: pointer; transition: var(--tr); }
-    .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .preset-btn.on { background: var(--accent-g); border-color: var(--accent); color: var(--accent); }
+    /* Repos */
+    .repo-layout{display:grid;grid-template-columns:220px 1fr;gap:12px;height:calc(100vh - 130px)}
+    .repo-sidebar{background:var(--bg1);border:1px solid var(--b);border-radius:var(--rlg);overflow:hidden;display:flex;flex-direction:column}
+    .repo-sidebar-hd{padding:10px 13px;border-bottom:1px solid var(--b);font-size:11px;font-weight:600;color:var(--td);display:flex;align-items:center;justify-content:space-between}
+    .repo-list{flex:1;overflow-y:auto;padding:6px}
+    .repo-item{padding:8px 10px;border-radius:8px;cursor:pointer;transition:var(--tr);margin-bottom:2px}
+    .repo-item:hover{background:var(--bg2)}
+    .repo-item.on{background:var(--ag);border:1px solid var(--bhi)}
+    .repo-nm{font-size:12px;font-weight:600;margin-bottom:1px}
+    .repo-path{font-size:10px;color:var(--tm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .repo-main{background:var(--bg1);border:1px solid var(--b);border-radius:var(--rlg);overflow:hidden;display:flex;flex-direction:column}
+    .repo-toolbar{padding:10px 14px;border-bottom:1px solid var(--b);display:flex;align-items:center;gap:8px;flex-shrink:0;background:var(--bg2)}
+    .breadcrumb{flex:1;font-size:12px;color:var(--td);font-family:'JetBrains Mono',monospace}
+    .breadcrumb span{cursor:pointer;transition:var(--tr)}
+    .breadcrumb span:hover{color:var(--ac)}
+    .breadcrumb .sep{margin:0 4px;color:var(--tm)}
+    .repo-body{flex:1;display:flex;overflow:hidden}
+    .file-tree{width:200px;border-right:1px solid var(--b);overflow-y:auto;padding:6px}
+    .file-tree::-webkit-scrollbar{width:3px}
+    .file-tree::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px}
+    .fe{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:7px;cursor:pointer;font-size:12px;transition:var(--tr)}
+    .fe:hover{background:var(--bg2)}
+    .fe.on{background:var(--ag);color:var(--ac)}
+    .fe.dir{font-weight:500}
+    .fe-ic{font-size:12px;flex-shrink:0;width:16px;text-align:center}
+    .fe-nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .fe-sz{font-size:10px;color:var(--tm);flex-shrink:0}
+    .editor-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .editor-hd{padding:8px 13px;border-bottom:1px solid var(--b);display:flex;align-items:center;gap:8px;background:var(--bg1);flex-shrink:0}
+    .ed-file{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--tx);flex:1}
+    .ed-meta{font-size:10px;color:var(--tm)}
+    .editor{flex:1;background:#090b10;border:none;outline:none;padding:14px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.75;color:#c9d1d9;width:100%;resize:none;tab-size:2}
+    .editor:focus{outline:none}
+    .git-bar{padding:8px 13px;border-top:1px solid var(--b);display:flex;align-items:center;gap:8px;background:var(--bg1);flex-shrink:0}
+    .git-msg{flex:1;background:var(--bg2);border:1px solid var(--b);border-radius:var(--r);color:var(--tx);font:12px 'Inter',sans-serif;padding:5px 9px;outline:none}
+    .git-msg:focus{border-color:var(--ac)}
+    .git-out{padding:8px 12px;background:var(--bg3);border-top:1px solid var(--b);font:11px/1.6 'JetBrains Mono',monospace;color:var(--td);max-height:80px;overflow-y:auto;flex-shrink:0;display:none}
+    .git-out.show{display:block}
+    .no-repo{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--tm);gap:10px;font-size:13px}
 
-    /* ── Queue tab ──────────────────────────────────── */
-    .queue-list { display: flex; flex-direction: column; gap: 8px; }
-    .q-item { display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r); }
-    .q-num { width: 22px; height: 22px; border-radius: 50%; background: var(--bg-3); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: var(--text-dim); flex-shrink: 0; margin-top: 1px; }
-    .q-info { flex: 1; min-width: 0; }
-    .q-url { font-size: 13px; font-weight: 500; word-break: break-all; margin-bottom: 2px; }
-    .q-meta { font-size: 11px; color: var(--text-muted); }
-    .q-del { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 14px; padding: 2px 5px; border-radius: 5px; transition: var(--tr); flex-shrink: 0; }
-    .q-del:hover { color: var(--red); background: rgba(252,129,129,.1); }
-    .q-empty { text-align: center; padding: 32px; color: var(--text-muted); font-size: 13px; }
+    /* Queue / History */
+    .qi{display:flex;align-items:flex-start;gap:9px;padding:10px 12px;background:var(--bg2);border:1px solid var(--b);border-radius:var(--r);margin-bottom:7px}
+    .qi-num{width:20px;height:20px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--td);flex-shrink:0;margin-top:2px}
+    .qi-body{flex:1;min-width:0}
+    .qi-url{font-size:12px;font-weight:500;word-break:break-all;margin-bottom:2px}
+    .qi-meta{font-size:10px;color:var(--tm)}
+    .qi-del{background:none;border:none;cursor:pointer;color:var(--tm);font-size:13px;padding:2px 5px;border-radius:5px;transition:var(--tr);flex-shrink:0}
+    .qi-del:hover{color:var(--rd);background:rgba(252,129,129,.1)}
+    .hi{padding:11px 13px;background:var(--bg2);border:1px solid var(--b);border-radius:var(--r);display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:start;margin-bottom:7px}
+    .hi-ic{font-size:17px}
+    .hi-nm{font-size:12px;font-weight:600;word-break:break-all;margin-bottom:2px}
+    .hi-s{font-size:11px;color:var(--td)}
+    .hi-ts{font-size:10px;color:var(--tm);margin-bottom:3px;text-align:right}
+    .hi-pr{font-size:11px;color:var(--ac);text-decoration:none}
+    .hi-pr:hover{text-decoration:underline}
 
-    /* ── History tab ──────────────────────────────── */
-    .hist-list { display: flex; flex-direction: column; gap: 8px; }
-    .h-item { padding: 12px 14px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r); display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; }
-    .h-icon { font-size: 18px; }
-    .h-body { min-width: 0; }
-    .h-url { font-size: 12px; font-weight: 600; word-break: break-all; margin-bottom: 2px; }
-    .h-sum { font-size: 11px; color: var(--text-dim); }
-    .h-meta { text-align: right; white-space: nowrap; }
-    .h-ts { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; }
-    .h-pr { font-size: 11px; color: var(--accent); text-decoration: none; }
-    .h-pr:hover { text-decoration: underline; }
-    .h-empty { text-align: center; padding: 32px; color: var(--text-muted); font-size: 13px; }
+    /* Util */
+    .div{height:1px;background:var(--b);margin:12px 0}
+    .row{display:flex;gap:8px}
+    .row .f{flex:1;margin:0}
+    .sl{font-size:10px;font-weight:600;color:var(--tm);text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px}
 
-    /* Utility */
-    .divider { height: 1px; background: var(--border); margin: 14px 0; }
-    .row { display: flex; gap: 10px; align-items: flex-start; }
-    .row .f { flex: 1; margin: 0; }
-    .gap-top { margin-top: 10px; }
-    .section-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px; }
-    .notif-bar { padding: 8px 13px; border-radius: var(--r); font-size: 12px; display: flex; align-items: center; gap: 7px; }
-    .notif-bar.info   { background: var(--accent-g); color: var(--accent); border: 1px solid var(--border-hi); }
-    .notif-bar.warn   { background: rgba(246,173,85,.1); color: var(--orange); border: 1px solid rgba(246,173,85,.2); }
-    .notif-bar.hidden { display: none; }
-
-    @media (max-width:860px) {
-      .app { flex-direction: column; height: auto; }
-      .sidebar { width: 100%; min-width: unset; border-right: none; border-bottom: 1px solid var(--border); max-height: 55vh; }
-      .main { min-height: 60vh; }
-      .res-grid { grid-template-columns: 1fr 1fr; }
-    }
-    @media (max-width:520px) {
-      .res-grid { grid-template-columns: 1fr; }
-      .topbar { padding: 0 14px; }
-      .panel { padding: 14px; }
-      .tabs .tab { padding: 6px 10px; font-size: 12px; }
+    @media(max-width:860px){
+      .app{flex-direction:column;height:auto}
+      .sb{width:100%;min-width:unset;border-right:none;border-bottom:1px solid var(--b);max-height:50vh}
+      .mn{min-height:60vh}
+      .rg{grid-template-columns:1fr 1fr}
+      .repo-layout{grid-template-columns:1fr;height:auto}
     }
   </style>
 </head>
 <body>
 <div class="app">
 
-  <!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
-  <aside class="sidebar">
-    <div class="sidebar-head">
-      <div class="logo">
-        <div class="logo-icon">🤖</div>
-        <div>
-          <div class="logo-name">Bug Engine</div>
-          <div class="logo-sub">Autonomous UI Repair Pipeline</div>
-        </div>
-      </div>
+<!-- ═══════════ SIDEBAR ═══════════ -->
+<aside class="sb">
+  <div class="sb-head">
+    <div class="logo">
+      <div class="logo-ic">🤖</div>
+      <div><div class="logo-nm">Bug Engine</div><div class="logo-sb">Autonomous UI Repair Pipeline</div></div>
     </div>
+  </div>
+  <div class="sb-sc">
 
-    <div class="sidebar-scroll">
-
-      <!-- LLM Provider -->
-      <div class="acc">
-        <button class="acc-hd open" onclick="accToggle(this)">
-          <span>⚡ LLM Provider</span><span class="ch">▼</span>
-        </button>
-        <div class="acc-bd open">
-          <div class="prov-wrap">
-            <button class="prov-btn on" id="pbtn-or" onclick="setProvider('openrouter')">OpenRouter</button>
-            <button class="prov-btn"    id="pbtn-bd" onclick="setProvider('bedrock')">AWS Bedrock</button>
-          </div>
-          <!-- OpenRouter -->
-          <div id="or-fields">
-            <div class="f"><label>API Key</label>
-              <input type="password" id="OPENROUTER_API_KEY" placeholder="sk-or-v1-…" autocomplete="off" />
-              <div class="f-hint">openrouter.ai/keys</div>
-            </div>
-            <div class="f"><label>Model</label>
-              <select id="MODEL_NAME">
-                <option value="x-ai/grok-4">xAI Grok-4</option>
-                <option value="x-ai/grok-3">xAI Grok-3</option>
-                <option value="openai/gpt-4o">OpenAI GPT-4o</option>
-                <option value="openai/gpt-4o-mini">OpenAI GPT-4o mini</option>
-                <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-                <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
-                <option value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B</option>
-                <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
-              </select>
-            </div>
-          </div>
-          <!-- Bedrock -->
-          <div id="bd-fields" style="display:none">
-            <div class="f"><label>AWS Access Key ID</label>
-              <input type="password" id="AWS_ACCESS_KEY_ID" placeholder="AKIA…" autocomplete="off" />
-            </div>
-            <div class="f"><label>AWS Secret Access Key</label>
-              <input type="password" id="AWS_SECRET_ACCESS_KEY" placeholder="secret…" autocomplete="off" />
-            </div>
-            <div class="f"><label>Region</label>
-              <select id="AWS_REGION">
-                <option value="us-east-1">us-east-1 (N. Virginia)</option>
-                <option value="us-west-2">us-west-2 (Oregon)</option>
-                <option value="eu-west-1">eu-west-1 (Ireland)</option>
-                <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
-              </select>
-            </div>
-            <div class="f"><label>Bedrock Model</label>
-              <select id="BEDROCK_MODEL_ID">
-                <option value="anthropic.claude-3-5-sonnet-20241022-v2:0">Claude 3.5 Sonnet v2</option>
-                <option value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku</option>
-                <option value="meta.llama3-3-70b-instruct-v1:0">Llama 3.3 70B</option>
-                <option value="amazon.nova-pro-v1:0">Amazon Nova Pro</option>
-                <option value="amazon.nova-lite-v1:0">Amazon Nova Lite</option>
-                <option value="mistral.mistral-large-2402-v1:0">Mistral Large</option>
-              </select>
-              <div class="f-hint">⚠️ Grok is not on Bedrock — use OpenRouter for Grok.</div>
-            </div>
-          </div>
-          <div class="f"><label>Temperature</label>
-            <input type="number" id="LLM_TEMPERATURE" value="0.0" min="0" max="2" step="0.1" />
-          </div>
-          <div class="f"><label>Max Tokens</label>
-            <input type="number" id="LLM_MAX_TOKENS" value="4096" min="256" step="256" />
-          </div>
+    <!-- LLM -->
+    <div class="ac">
+      <button class="ac-hd op" onclick="acc(this)"><span>⚡ LLM Provider</span><span class="ch">▼</span></button>
+      <div class="ac-bd op">
+        <div class="pvw">
+          <button class="pvb on" id="pb-or" onclick="setProv('openrouter')">OpenRouter</button>
+          <button class="pvb"    id="pb-bd" onclick="setProv('bedrock')">AWS Bedrock</button>
         </div>
-      </div>
-
-      <!-- GitHub -->
-      <div class="acc">
-        <button class="acc-hd" onclick="accToggle(this)">
-          <span>🐙 GitHub</span><span class="ch">▼</span>
-        </button>
-        <div class="acc-bd">
-          <div class="f"><label>Personal Access Token</label>
-            <input type="password" id="GITHUB_TOKEN" placeholder="github_pat_…" autocomplete="off" />
-            <div class="f-hint">Needs: Contents (rw) + Pull Requests (rw)</div>
-          </div>
-          <div class="f"><label>Repository (owner/repo)</label>
-            <input type="text" id="REPO_NAME" placeholder="KashinathTilagul/autonomous-engine" />
-          </div>
-          <div class="f"><label>Base Branch</label>
-            <input type="text" id="GITHUB_BASE_BRANCH" value="main" />
-          </div>
-        </div>
-      </div>
-
-      <!-- OpenHands -->
-      <div class="acc">
-        <button class="acc-hd" onclick="accToggle(this)">
-          <span>🐳 OpenHands</span><span class="ch">▼</span>
-        </button>
-        <div class="acc-bd">
-          <div class="f"><label>API URL</label>
-            <input type="text" id="OPENHANDS_API_URL" value="http://localhost:3000" />
-            <div class="f-hint">Docker container REST endpoint</div>
-          </div>
-          <div class="f"><label>API Key (optional)</label>
-            <input type="password" id="OPENHANDS_API_KEY" placeholder="leave blank if none" autocomplete="off" />
-          </div>
-          <div class="f"><label>Timeout (seconds)</label>
-            <input type="number" id="OPENHANDS_TIMEOUT_SECONDS" value="600" min="60" step="60" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Browser -->
-      <div class="acc">
-        <button class="acc-hd" onclick="accToggle(this)">
-          <span>🌐 Browser / Misc</span><span class="ch">▼</span>
-        </button>
-        <div class="acc-bd">
-          <div class="f"><label>Max Browser Steps</label>
-            <input type="number" id="BROWSER_MAX_STEPS" value="25" min="5" max="100" />
-          </div>
-          <div class="f"><label>Log Level</label>
-            <select id="LOG_LEVEL">
-              <option value="INFO">INFO</option>
-              <option value="DEBUG">DEBUG</option>
-              <option value="WARNING">WARNING</option>
-              <option value="ERROR">ERROR</option>
+        <div id="or-f">
+          <div class="f"><label>API Key</label><input type="password" id="OPENROUTER_API_KEY" placeholder="sk-or-v1-…" autocomplete="off"/><div class="fh">openrouter.ai/keys</div></div>
+          <div class="f"><label>Model</label>
+            <select id="MODEL_NAME">
+              <option value="x-ai/grok-4">xAI Grok-4</option>
+              <option value="x-ai/grok-3">xAI Grok-3</option>
+              <option value="openai/gpt-4o">GPT-4o</option>
+              <option value="openai/gpt-4o-mini">GPT-4o mini</option>
+              <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+              <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
+              <option value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B</option>
+              <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
             </select>
           </div>
         </div>
+        <div id="bd-f" style="display:none">
+          <div class="f"><label>AWS Access Key ID</label><input type="password" id="AWS_ACCESS_KEY_ID" placeholder="AKIA…" autocomplete="off"/></div>
+          <div class="f"><label>AWS Secret Access Key</label><input type="password" id="AWS_SECRET_ACCESS_KEY" placeholder="secret…" autocomplete="off"/></div>
+          <div class="f"><label>Region</label>
+            <select id="AWS_REGION">
+              <option value="us-east-1">us-east-1</option><option value="us-west-2">us-west-2</option>
+              <option value="eu-west-1">eu-west-1</option><option value="ap-southeast-1">ap-southeast-1</option>
+            </select>
+          </div>
+          <div class="f"><label>Bedrock Model</label>
+            <select id="BEDROCK_MODEL_ID">
+              <option value="anthropic.claude-3-5-sonnet-20241022-v2:0">Claude 3.5 Sonnet v2</option>
+              <option value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku</option>
+              <option value="meta.llama3-3-70b-instruct-v1:0">Llama 3.3 70B</option>
+              <option value="amazon.nova-pro-v1:0">Nova Pro</option>
+              <option value="amazon.nova-lite-v1:0">Nova Lite</option>
+            </select>
+            <div class="fh">⚠ Grok is on OpenRouter, not Bedrock.</div>
+          </div>
+        </div>
+        <div class="f"><label>Temperature</label><input type="number" id="LLM_TEMPERATURE" value="0.0" min="0" max="2" step="0.1"/></div>
+        <div class="f"><label>Max Tokens</label><input type="number" id="LLM_MAX_TOKENS" value="4096" min="256" step="256"/></div>
       </div>
-    </div><!-- /sidebar-scroll -->
-
-    <div class="sidebar-foot">
-      <div class="save-note" id="saveNote">✓ Saved securely to .env</div>
-      <button class="btn btn-p btn-full" onclick="saveSettings()" id="saveBtn">💾 Save Settings</button>
     </div>
-  </aside>
 
-  <!-- ═══════════════════════ MAIN ══════════════════════════ -->
-  <main class="main">
-    <div class="topbar">
-      <div class="tabs">
-        <button class="tab on"  id="tab-run"      onclick="switchTab('run')">▶ Run</button>
-        <button class="tab"     id="tab-automate" onclick="switchTab('automate')">⏰ Automate</button>
-        <button class="tab"     id="tab-queue"    onclick="switchTab('queue')">📋 Queue <span id="q-badge"></span></button>
-        <button class="tab"     id="tab-history"  onclick="switchTab('history')">🕘 History</button>
-      </div>
-      <div class="status" id="statusBadge">
-        <span class="dot"></span><span id="statusTxt">Idle</span>
+    <!-- GitHub -->
+    <div class="ac">
+      <button class="ac-hd" onclick="acc(this)"><span>🐙 GitHub</span><span class="ch">▼</span></button>
+      <div class="ac-bd">
+        <div class="f"><label>Personal Access Token</label><input type="password" id="GITHUB_TOKEN" placeholder="github_pat_…" autocomplete="off"/><div class="fh">Contents (rw) + Pull Requests (rw)</div></div>
+        <div class="f"><label>Default Repository</label><input type="text" id="REPO_NAME" placeholder="owner/repo"/></div>
+        <div class="f"><label>Base Branch</label><input type="text" id="GITHUB_BASE_BRANCH" value="main"/></div>
       </div>
     </div>
 
-    <!-- ─── RUN panel ─────────────────────────────────── -->
-    <div class="panel on" id="panel-run">
-      <div class="card">
-        <div class="card-title">🚀 Run Pipeline</div>
-        <div class="run-grid">
-          <div class="f"><label>Target URL *</label>
-            <input type="url" id="r-url" placeholder="https://staging.example.com" />
-          </div>
-          <div class="f"><label>Test Scenario</label>
-            <textarea id="r-scenario" rows="3" placeholder="Navigate the site as a new user and report any visual or functional bugs…"></textarea>
-          </div>
-          <div class="f"><label>Local Repo Path</label>
-            <input type="text" id="r-repo" value="." placeholder="/absolute/path/to/repo" />
-          </div>
-          <div class="run-actions">
-            <button class="btn btn-p" id="runBtn" onclick="startRun()">▶ Run Now</button>
-            <button class="btn btn-g btn-sm" onclick="addToQueue()">+ Add to Queue</button>
-            <button class="btn btn-g btn-sm" onclick="clearLog()">Clear</button>
-            <div class="check-group">
-              <label class="check-lbl"><input type="checkbox" id="r-verify" checked /> Re-verify</label>
-              <label class="check-lbl"><input type="checkbox" id="r-pr" /> Publish PR</label>
-            </div>
-          </div>
-        </div>
+    <!-- OpenHands -->
+    <div class="ac">
+      <button class="ac-hd" onclick="acc(this)"><span>🐳 OpenHands</span><span class="ch">▼</span></button>
+      <div class="ac-bd">
+        <div class="f"><label>API URL</label><input type="text" id="OPENHANDS_API_URL" value="http://localhost:3000"/></div>
+        <div class="f"><label>API Key (optional)</label><input type="password" id="OPENHANDS_API_KEY" placeholder="leave blank" autocomplete="off"/></div>
+        <div class="f"><label>Timeout (sec)</label><input type="number" id="OPENHANDS_TIMEOUT_SECONDS" value="600" min="60" step="60"/></div>
       </div>
+    </div>
 
-      <!-- Console -->
-      <div class="console">
-        <div class="con-head">
-          <div class="con-dots"><span class="cd-r"></span><span class="cd-y"></span><span class="cd-g"></span></div>
-          <div class="con-title">📡 Live Output</div>
-          <button class="btn btn-g btn-sm" onclick="copyLog()">Copy</button>
-        </div>
-        <div class="con-body" id="conBody">
-          <span class="ll muted">Output will appear here when a run starts…</span>
-        </div>
-      </div>
-
-      <!-- Result -->
-      <div id="resSection" style="display:none">
-        <div class="card" style="margin-top:14px;margin-bottom:0">
-          <div class="card-title">📊 Last Result</div>
-          <div class="res-grid">
-            <div class="res-card"><div class="rc-lbl">Bug Found</div><div class="rc-val" id="rv-bug">—</div></div>
-            <div class="res-card"><div class="rc-lbl">Severity</div> <div class="rc-val" id="rv-sev">—</div></div>
-            <div class="res-card"><div class="rc-lbl">Fixed</div>    <div class="rc-val" id="rv-fix">—</div></div>
-          </div>
-          <div id="rv-sum" style="margin-top:10px;font-size:12px;color:var(--text-dim);display:none"></div>
-          <a id="rv-pr" class="pr-link" style="display:none" target="_blank">🔗 View Pull Request</a>
+    <!-- Browser -->
+    <div class="ac">
+      <button class="ac-hd" onclick="acc(this)"><span>🌐 Browser</span><span class="ch">▼</span></button>
+      <div class="ac-bd">
+        <div class="f"><label>Max Steps</label><input type="number" id="BROWSER_MAX_STEPS" value="25" min="5" max="100"/></div>
+        <div class="f"><label>Log Level</label>
+          <select id="LOG_LEVEL"><option>INFO</option><option>DEBUG</option><option>WARNING</option><option>ERROR</option></select>
         </div>
       </div>
     </div>
 
-    <!-- ─── AUTOMATE panel ────────────────────────────── -->
-    <div class="panel" id="panel-automate">
-      <div class="card">
-        <div class="card-title">⏰ Automated Scheduling</div>
+  </div>
+  <div class="sb-ft">
+    <div class="sv-note" id="svNote">✓ Saved securely to .env</div>
+    <button class="btn btn-p btn-full" onclick="saveSettings()" id="svBtn">💾 Save Settings</button>
+  </div>
+</aside>
 
-        <div id="sched-active" class="sched-info hidden">
-          <span>⏰</span><span id="sched-next-txt">Next run: calculating…</span>
-          <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="disableSchedule()">Stop</button>
-        </div>
-
-        <div class="section-label">Schedule Mode</div>
-        <div class="mode-tabs">
-          <button class="mode-btn on" id="smode-interval" onclick="setSMode('interval')">Every N Minutes</button>
-          <button class="mode-btn"    id="smode-cron"     onclick="setSMode('cron')">Cron Expression</button>
-        </div>
-
-        <!-- Interval mode -->
-        <div id="interval-mode">
-          <div class="section-label">Quick Presets</div>
-          <div class="interval-presets">
-            <button class="preset-btn" onclick="setInterval(15)">15 min</button>
-            <button class="preset-btn" onclick="setInterval(30)">30 min</button>
-            <button class="preset-btn" onclick="setInterval(60)">1 hour</button>
-            <button class="preset-btn" onclick="setInterval(360)">6 hours</button>
-            <button class="preset-btn" onclick="setInterval(720)">12 hours</button>
-            <button class="preset-btn" onclick="setInterval(1440)">Daily</button>
-          </div>
-          <div class="f"><label>Custom Interval (minutes)</label>
-            <input type="number" id="s-interval" value="60" min="5" step="5" />
-          </div>
-        </div>
-
-        <!-- Cron mode -->
-        <div id="cron-mode" style="display:none">
-          <div class="f"><label>Cron Expression (5 fields)</label>
-            <input type="text" id="s-cron" placeholder="0 9 * * 1-5" />
-            <div class="f-hint">Examples: <code>0 9 * * *</code> (daily 9am) · <code>0 */4 * * *</code> (every 4h) · <code>30 8 * * 1-5</code> (weekdays 8:30am)</div>
-          </div>
-          <div class="interval-presets">
-            <button class="preset-btn" onclick="setCron('*/30 * * * *')">Every 30min</button>
-            <button class="preset-btn" onclick="setCron('0 * * * *')">Hourly</button>
-            <button class="preset-btn" onclick="setCron('0 9 * * *')">Daily 9am</button>
-            <button class="preset-btn" onclick="setCron('0 9 * * 1-5')">Weekdays 9am</button>
-          </div>
-        </div>
-
-        <div class="divider"></div>
-        <div class="section-label">Target for Scheduled Runs</div>
-        <div class="f"><label>URL *</label>
-          <input type="url" id="s-url" placeholder="https://your-site.com" />
-        </div>
-        <div class="f"><label>Scenario</label>
-          <textarea id="s-scenario" rows="2" placeholder="Navigate the site as a new user and report any visual or functional bugs…"></textarea>
-        </div>
-        <div class="row gap-top">
-          <div class="f"><label>Repo Path</label>
-            <input type="text" id="s-repo" value="." />
-          </div>
-        </div>
-        <div class="check-group" style="margin-top:10px;margin-bottom:14px">
-          <label class="check-lbl"><input type="checkbox" id="s-verify" checked /> Re-verify</label>
-          <label class="check-lbl"><input type="checkbox" id="s-pr" /> Auto-publish PR</label>
-        </div>
-
-        <button class="btn btn-p" onclick="saveSchedule()">⏰ Activate Schedule</button>
-        <button class="btn btn-g btn-sm" style="margin-left:8px" onclick="runScheduledNow()">▶ Run Now Once</button>
-      </div>
-
-      <!-- Browser notifications -->
-      <div class="card">
-        <div class="card-title">🔔 Browser Notifications</div>
-        <p style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Get a desktop notification when a scheduled run completes or finds a bug.</p>
-        <button class="btn btn-g btn-sm" onclick="requestNotifPerm()" id="notifBtn">Enable Notifications</button>
-        <span id="notifStatus" style="margin-left:10px;font-size:11px;color:var(--text-dim)"></span>
-      </div>
+<!-- ═══════════ MAIN ═══════════ -->
+<main class="mn">
+  <div class="tb">
+    <div class="tabs">
+      <button class="tab on"  id="t-run"      onclick="sw('run')">▶ Run</button>
+      <button class="tab"     id="t-targets"  onclick="sw('targets')">🎯 Targets <span id="tg-badge"></span></button>
+      <button class="tab"     id="t-repos"    onclick="sw('repos')">📁 Repos</button>
+      <button class="tab"     id="t-automate" onclick="sw('automate')">⏰ Automate</button>
+      <button class="tab"     id="t-queue"    onclick="sw('queue')">📋 Queue <span id="q-badge"></span></button>
+      <button class="tab"     id="t-history"  onclick="sw('history')">🕘 History</button>
     </div>
+    <div class="status" id="stBadge"><span class="dot"></span><span id="stTxt">Idle</span></div>
+  </div>
 
-    <!-- ─── QUEUE panel ───────────────────────────────── -->
-    <div class="panel" id="panel-queue">
-      <div class="card">
-        <div class="card-title" style="justify-content:space-between">
-          <span>📋 URL Queue</span>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-green btn-sm" id="runQueueBtn" onclick="runQueue()">▶ Run All</button>
-            <button class="btn btn-danger btn-sm" onclick="clearQueue()">Clear</button>
+  <!-- ── RUN ─────────────────────────────────── -->
+  <div class="panel on" id="p-run">
+    <div class="card">
+      <div class="ct"><span>🚀 Run Pipeline</span></div>
+      <div style="display:flex;flex-direction:column;gap:11px">
+        <div class="f"><label>Target URL *</label><input type="url" id="r-url" placeholder="https://staging.example.com"/></div>
+        <div class="f"><label>Test Scenario</label><textarea id="r-sc" rows="3" placeholder="Navigate the site as a new user and report any visual or functional bugs…"></textarea></div>
+        <div class="row">
+          <div class="f"><label>Local Repo Path (for fixes)</label><input type="text" id="r-rp" value="." placeholder="/abs/path/to/repo"/></div>
+          <div class="f"><label>GitHub Repo (owner/repo)</label><input type="text" id="r-gh" placeholder="KashinathTilagul/autonomous-engine"/></div>
+        </div>
+        <div class="ract">
+          <button class="btn btn-p" id="runBtn" onclick="startRun()">▶ Run Now</button>
+          <button class="btn btn-g btn-sm" onclick="addToQueue()">+ Queue</button>
+          <button class="btn btn-g btn-sm" onclick="clearLog()">Clear</button>
+          <div class="ck">
+            <label><input type="checkbox" id="r-vf" checked/> Re-verify</label>
+            <label><input type="checkbox" id="r-pr"/> Publish PR</label>
           </div>
-        </div>
-        <div class="queue-list" id="queueList">
-          <div class="q-empty">No URLs in queue. Add from the Run tab or below.</div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title">➕ Add to Queue</div>
-        <div class="f"><label>URL</label>
-          <input type="url" id="qa-url" placeholder="https://example.com/page" />
-        </div>
-        <div class="f"><label>Scenario (optional)</label>
-          <input type="text" id="qa-scenario" placeholder="Click every button and look for errors" />
-        </div>
-        <div class="check-group" style="margin-bottom:12px">
-          <label class="check-lbl"><input type="checkbox" id="qa-verify" checked /> Re-verify</label>
-          <label class="check-lbl"><input type="checkbox" id="qa-pr" /> Publish PR</label>
-        </div>
-        <button class="btn btn-p btn-sm" onclick="addItemToQueue()">Add to Queue</button>
-      </div>
-    </div>
-
-    <!-- ─── HISTORY panel ─────────────────────────────── -->
-    <div class="panel" id="panel-history">
-      <div class="card">
-        <div class="card-title" style="justify-content:space-between">
-          <span>🕘 Run History</span>
-          <button class="btn btn-danger btn-sm" onclick="clearHistory()">Clear All</button>
-        </div>
-        <div class="hist-list" id="histList">
-          <div class="h-empty">No runs yet. Start a run or schedule one!</div>
         </div>
       </div>
     </div>
+    <div class="con">
+      <div class="con-hd">
+        <div class="cdots"><span class="cr"></span><span class="cy"></span><span class="cg"></span></div>
+        <div class="con-ti">📡 Live Output</div>
+        <button class="btn btn-g btn-sm" onclick="copyLog()">Copy</button>
+      </div>
+      <div class="con-bd" id="conBd"><span class="ll mt">Output will appear here when a run starts…</span></div>
+    </div>
+    <div id="resSec" style="display:none">
+      <div class="card" style="margin-top:12px;margin-bottom:0">
+        <div class="ct">📊 Last Result</div>
+        <div class="rg">
+          <div class="rc"><div class="rl">Bug Found</div><div class="rv" id="rv-bg">—</div></div>
+          <div class="rc"><div class="rl">Severity</div> <div class="rv" id="rv-sv">—</div></div>
+          <div class="rc"><div class="rl">Fixed</div>    <div class="rv" id="rv-fx">—</div></div>
+        </div>
+        <div id="rv-sm" style="margin-top:9px;font-size:11px;color:var(--td);display:none"></div>
+        <a id="rv-pr" class="pr-link" style="display:none" target="_blank">🔗 View Pull Request</a>
+      </div>
+    </div>
+  </div>
 
-  </main>
-</div><!-- /app -->
+  <!-- ── TARGETS ─────────────────────────────── -->
+  <div class="panel" id="p-targets">
+    <div class="card">
+      <div class="ct">
+        <span>🎯 Audit Targets</span>
+        <button class="btn btn-p btn-sm" onclick="openAddTarget()">+ Add Target</button>
+      </div>
+      <div id="tgList"><div class="empty-state"><div class="em-ic">🎯</div>No targets yet. Add a URL to audit.</div></div>
+    </div>
+
+    <!-- Add/Edit Target form (hidden by default) -->
+    <div class="card" id="tgForm" style="display:none">
+      <div class="ct"><span id="tgFormTitle">➕ Add Target</span></div>
+      <input type="hidden" id="tg-edit-id"/>
+      <div class="row"><div class="f"><label>Name / Label</label><input type="text" id="tg-name" placeholder="e.g. Homepage, Login Page"/></div></div>
+      <div class="f" style="margin-top:8px"><label>URL *</label><input type="url" id="tg-url" placeholder="https://your-site.com/page"/></div>
+      <div class="f"><label>Scenario</label><textarea id="tg-sc" rows="2" placeholder="Navigate and report any visual or functional bugs…"></textarea></div>
+      <div class="f"><label>Tags (comma-separated)</label><input type="text" id="tg-tags" placeholder="homepage, auth, critical"/></div>
+      <div class="f"><label>Notes</label><input type="text" id="tg-notes" placeholder="Optional notes about this target"/></div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-p btn-sm" onclick="saveTarget()">Save</button>
+        <button class="btn btn-g btn-sm" onclick="closeTargetForm()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── REPOS ──────────────────────────────── -->
+  <div class="panel" id="p-repos">
+    <div class="repo-layout">
+
+      <!-- Repo sidebar list -->
+      <div class="repo-sidebar">
+        <div class="repo-sidebar-hd">
+          <span>Repositories</span>
+          <button class="btn btn-p btn-sm" onclick="openAddRepo()">+</button>
+        </div>
+        <div class="repo-list" id="repoList">
+          <div class="empty-state" style="padding:20px 10px"><div class="em-ic" style="font-size:24px">📁</div>No repos added</div>
+        </div>
+        <!-- Add repo mini-form -->
+        <div id="addRepoForm" style="display:none;padding:10px;border-top:1px solid var(--b)">
+          <div class="f"><label>Name</label><input type="text" id="rp-name" placeholder="My App"/></div>
+          <div class="f"><label>Local Path</label><input type="text" id="rp-path" placeholder="/Users/you/projects/app"/></div>
+          <div class="f"><label>GitHub URL (optional)</label><input type="text" id="rp-gh" placeholder="https://github.com/owner/repo"/></div>
+          <div class="f"><label>Branch</label><input type="text" id="rp-br" value="main"/></div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-p btn-sm" onclick="saveRepo()">Add</button>
+            <button class="btn btn-g btn-sm" onclick="document.getElementById('addRepoForm').style.display='none'">✕</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- File browser + editor -->
+      <div class="repo-main">
+        <div class="repo-toolbar">
+          <div class="breadcrumb" id="breadcrumb">Select a repository →</div>
+          <button class="btn btn-g btn-sm" onclick="navUp()" id="navUpBtn" title="Go up" style="display:none">↑ Up</button>
+          <button class="btn btn-gr btn-sm" onclick="newFile()" id="newFileBtn" style="display:none">+ File</button>
+        </div>
+        <div class="repo-body" id="repoBody">
+          <div class="no-repo"><span style="font-size:36px">📁</span><span>Select a repository from the left to browse its files.</span></div>
+        </div>
+        <!-- Git bar (hidden until repo selected) -->
+        <div class="git-bar" id="gitBar" style="display:none">
+          <input class="git-msg" id="git-msg" value="chore: edit via Bug Engine UI" placeholder="Commit message…"/>
+          <button class="btn btn-g btn-sm" onclick="gitOp('status')">Status</button>
+          <button class="btn btn-g btn-sm" onclick="gitOp('diff')">Diff</button>
+          <button class="btn btn-g btn-sm" onclick="gitOp('commit')">Commit</button>
+          <button class="btn btn-p btn-sm" onclick="gitOp('push')">Push</button>
+          <button class="btn btn-g btn-sm" onclick="gitOp('pull')">Pull</button>
+        </div>
+        <div class="git-out" id="gitOut"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── AUTOMATE ────────────────────────────── -->
+  <div class="panel" id="p-automate">
+    <div class="card">
+      <div class="ct">⏰ Schedule</div>
+      <div id="sched-bar" class="sched-bar" style="display:none">
+        <span>⏰</span><span id="sched-next">Next: …</span>
+        <button class="btn btn-rd btn-sm" style="margin-left:auto" onclick="disableSched()">Stop</button>
+      </div>
+      <div class="mtabs">
+        <button class="mtab on" id="sm-iv" onclick="setSM('interval')">Every N Minutes</button>
+        <button class="mtab"    id="sm-cr" onclick="setSM('cron')">Cron</button>
+      </div>
+      <div id="iv-mode">
+        <div class="sl">Quick Presets</div>
+        <div class="presets">
+          <button class="pb" onclick="setIv(15,this)">15 min</button>
+          <button class="pb" onclick="setIv(30,this)">30 min</button>
+          <button class="pb" onclick="setIv(60,this)">1 h</button>
+          <button class="pb" onclick="setIv(360,this)">6 h</button>
+          <button class="pb" onclick="setIv(720,this)">12 h</button>
+          <button class="pb" onclick="setIv(1440,this)">Daily</button>
+        </div>
+        <div class="f"><label>Custom Interval (minutes)</label><input type="number" id="s-iv" value="60" min="5" step="5"/></div>
+      </div>
+      <div id="cr-mode" style="display:none">
+        <div class="f"><label>Cron Expression</label><input type="text" id="s-cr" placeholder="0 9 * * 1-5"/>
+          <div class="fh">5 fields: min hour dom month dow — e.g. <code>0 9 * * *</code> = daily 9am</div>
+        </div>
+        <div class="presets">
+          <button class="pb" onclick="setCron('*/30 * * * *',this)">Every 30min</button>
+          <button class="pb" onclick="setCron('0 * * * *',this)">Hourly</button>
+          <button class="pb" onclick="setCron('0 9 * * *',this)">Daily 9am</button>
+          <button class="pb" onclick="setCron('0 9 * * 1-5',this)">Weekdays 9am</button>
+        </div>
+      </div>
+      <div class="div"></div>
+      <div class="sl">Scheduled Target</div>
+      <div class="f"><label>URL *</label><input type="url" id="s-url" placeholder="https://your-site.com"/></div>
+      <div class="f"><label>Scenario</label><textarea id="s-sc" rows="2" placeholder="Navigate and report bugs…"></textarea></div>
+      <div class="row"><div class="f"><label>Repo Path</label><input type="text" id="s-rp" value="."/></div></div>
+      <div class="ck" style="margin:10px 0 14px">
+        <label><input type="checkbox" id="s-vf" checked/> Re-verify</label>
+        <label><input type="checkbox" id="s-pr"/> Auto-publish PR</label>
+      </div>
+      <button class="btn btn-p" onclick="saveSched()">⏰ Activate</button>
+      <button class="btn btn-g btn-sm" style="margin-left:8px" onclick="runSchedNow()">▶ Run Now</button>
+    </div>
+    <div class="card">
+      <div class="ct">🔔 Browser Notifications</div>
+      <p style="font-size:11px;color:var(--td);margin-bottom:11px">Get a desktop notification when any run completes or finds a bug.</p>
+      <button class="btn btn-g btn-sm" onclick="reqNotif()" id="notifBtn">Enable Notifications</button>
+      <span id="notifSt" style="margin-left:9px;font-size:11px;color:var(--td)"></span>
+    </div>
+  </div>
+
+  <!-- ── QUEUE ──────────────────────────────── -->
+  <div class="panel" id="p-queue">
+    <div class="card">
+      <div class="ct">
+        <span>📋 Queue</span>
+        <div style="display:flex;gap:7px">
+          <button class="btn btn-gr btn-sm" id="rqBtn" onclick="runQueue()">▶ Run All</button>
+          <button class="btn btn-rd btn-sm" onclick="clearQueue()">Clear</button>
+        </div>
+      </div>
+      <div id="qList"><div class="empty-state"><div class="em-ic">📋</div>Queue is empty.</div></div>
+    </div>
+    <div class="card">
+      <div class="ct">➕ Add to Queue</div>
+      <div class="f"><label>URL</label><input type="url" id="qa-url" placeholder="https://example.com/page"/></div>
+      <div class="f"><label>Scenario (optional)</label><input type="text" id="qa-sc" placeholder="Test the checkout flow"/></div>
+      <div class="ck" style="margin-bottom:11px">
+        <label><input type="checkbox" id="qa-vf" checked/> Re-verify</label>
+        <label><input type="checkbox" id="qa-pr"/> Publish PR</label>
+      </div>
+      <button class="btn btn-p btn-sm" onclick="addQItem()">Add</button>
+    </div>
+  </div>
+
+  <!-- ── HISTORY ────────────────────────────── -->
+  <div class="panel" id="p-history">
+    <div class="card">
+      <div class="ct">
+        <span>🕘 Run History</span>
+        <button class="btn btn-rd btn-sm" onclick="clearHist()">Clear All</button>
+      </div>
+      <div id="histList"><div class="empty-state"><div class="em-ic">🕘</div>No runs yet.</div></div>
+    </div>
+  </div>
+
+</main>
+</div>
 
 <script>
-/* ════════════════════════════════════════════════
-   State
-   ════════════════════════════════════════════════ */
-let provider = 'openrouter';
-let schedMode = 'interval';
-let sseConn = null;
-let notifAllowed = false;
-let pollTimer = null;
+/* ════════ State ════════ */
+let prov='openrouter', sMode='interval', sseConn=null, pollTmr=null;
+let notifOk=false;
+let activeRepo=null, curPath='.', openFile=null;
 
-/* ════════════════════════════════════════════════
-   Boot
-   ════════════════════════════════════════════════ */
-document.addEventListener('DOMContentLoaded', () => {
-  loadSettings();
-  loadQueue();
-  loadHistory();
-  loadSchedule();
-  checkNotifPerm();
-  // Poll status every 5s to keep badge fresh
-  setInterval(refreshStatus, 5000);
+/* ════════ Boot ════════ */
+document.addEventListener('DOMContentLoaded',()=>{
+  loadSettings(); loadTargets(); loadQueue(); loadHistory(); loadSchedule(); loadRepos(); checkNotif();
+  setInterval(refreshSt,6000);
 });
 
-/* ════════════════════════════════════════════════
-   Tab switching
-   ════════════════════════════════════════════════ */
-function switchTab(name) {
-  ['run','automate','queue','history'].forEach(t => {
-    document.getElementById(`tab-${t}`).classList.toggle('on', t === name);
-    document.getElementById(`panel-${t}`).classList.toggle('on', t === name);
+/* ════════ Tabs ════════ */
+const TABS=['run','targets','repos','automate','queue','history'];
+function sw(n){
+  TABS.forEach(t=>{
+    document.getElementById(`t-${t}`).classList.toggle('on',t===n);
+    document.getElementById(`p-${t}`).classList.toggle('on',t===n);
   });
-  if (name === 'history') loadHistory();
-  if (name === 'queue')   loadQueue();
-  if (name === 'automate') loadSchedule();
+  if(n==='history') loadHistory();
+  if(n==='queue')   loadQueue();
+  if(n==='targets') loadTargets();
+  if(n==='automate') loadSchedule();
+  if(n==='repos')   loadRepos();
 }
 
-/* ════════════════════════════════════════════════
-   Sidebar accordion
-   ════════════════════════════════════════════════ */
-function accToggle(btn) {
-  btn.classList.toggle('open');
-  btn.nextElementSibling.classList.toggle('open');
+/* ════════ Accordion ════════ */
+function acc(btn){btn.classList.toggle('op');btn.nextElementSibling.classList.toggle('op')}
+
+/* ════════ Provider ════════ */
+function setProv(p){
+  prov=p;
+  document.getElementById('pb-or').classList.toggle('on',p==='openrouter');
+  document.getElementById('pb-bd').classList.toggle('on',p==='bedrock');
+  document.getElementById('or-f').style.display=p==='openrouter'?'':'none';
+  document.getElementById('bd-f').style.display=p==='bedrock'?'':'none';
 }
 
-/* ════════════════════════════════════════════════
-   Provider
-   ════════════════════════════════════════════════ */
-function setProvider(p) {
-  provider = p;
-  document.getElementById('pbtn-or').classList.toggle('on', p === 'openrouter');
-  document.getElementById('pbtn-bd').classList.toggle('on', p === 'bedrock');
-  document.getElementById('or-fields').style.display = p === 'openrouter' ? '' : 'none';
-  document.getElementById('bd-fields').style.display  = p === 'bedrock'    ? '' : 'none';
+/* ════════ Settings ════════ */
+async function loadSettings(){
+  try{
+    const d=await fetch('/api/settings').then(r=>r.json());
+    ['OPENROUTER_API_KEY','MODEL_NAME','LLM_TEMPERATURE','LLM_MAX_TOKENS','OPENHANDS_API_URL',
+     'OPENHANDS_API_KEY','OPENHANDS_TIMEOUT_SECONDS','GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH',
+     'BROWSER_MAX_STEPS','LOG_LEVEL','AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_REGION','BEDROCK_MODEL_ID']
+    .forEach(k=>{const el=document.getElementById(k);if(el&&d[k])el.value=d[k];});
+    setProv(d.LLM_PROVIDER||'openrouter');
+  }catch(e){console.warn(e)}
 }
-
-/* ════════════════════════════════════════════════
-   Settings
-   ════════════════════════════════════════════════ */
-async function loadSettings() {
-  try {
-    const d = await fetch('/api/settings').then(r => r.json());
-    const flds = ['OPENROUTER_API_KEY','MODEL_NAME','LLM_TEMPERATURE','LLM_MAX_TOKENS',
-      'OPENHANDS_API_URL','OPENHANDS_API_KEY','OPENHANDS_TIMEOUT_SECONDS',
-      'GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH','BROWSER_MAX_STEPS','LOG_LEVEL',
-      'AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_REGION','BEDROCK_MODEL_ID'];
-    flds.forEach(k => { const el = document.getElementById(k); if (el && d[k]) el.value = d[k]; });
-    setProvider(d.LLM_PROVIDER || 'openrouter');
-  } catch(e) { console.warn('loadSettings:', e); }
-}
-
-async function saveSettings() {
-  const btn = document.getElementById('saveBtn');
-  btn.disabled = true; btn.textContent = 'Saving…';
-  const payload = { LLM_PROVIDER: provider };
+async function saveSettings(){
+  const btn=document.getElementById('svBtn');
+  btn.disabled=true; btn.textContent='Saving…';
+  const p={LLM_PROVIDER:prov};
   ['OPENROUTER_API_KEY','MODEL_NAME','OPENROUTER_BASE_URL','LLM_TEMPERATURE','LLM_MAX_TOKENS',
    'AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_REGION','BEDROCK_MODEL_ID',
    'OPENHANDS_API_URL','OPENHANDS_API_KEY','OPENHANDS_TIMEOUT_SECONDS',
    'GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH','BROWSER_MAX_STEPS','LOG_LEVEL']
-   .forEach(k => { const el = document.getElementById(k); if (el) payload[k] = el.value; });
-  try {
-    const r = await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-    if (!r.ok) throw new Error(await r.text());
-    const n = document.getElementById('saveNote');
-    n.classList.add('show'); setTimeout(() => n.classList.remove('show'), 3000);
-  } catch(e) { alert('Save failed: ' + e.message); }
-  btn.disabled = false; btn.textContent = '💾 Save Settings';
+  .forEach(k=>{const el=document.getElementById(k);if(el)p[k]=el.value;});
+  try{
+    const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+    if(!r.ok)throw new Error(await r.text());
+    const n=document.getElementById('svNote');n.classList.add('show');setTimeout(()=>n.classList.remove('show'),3000);
+  }catch(e){alert('Save failed: '+e.message);}
+  btn.disabled=false;btn.textContent='💾 Save Settings';
 }
 
-/* ════════════════════════════════════════════════
-   Run
-   ════════════════════════════════════════════════ */
-async function startRun() {
-  const url = document.getElementById('r-url').value.trim();
-  if (!url) { alert('Enter a target URL.'); return; }
-  const payload = {
-    url,
-    scenario:   document.getElementById('r-scenario').value.trim(),
-    repo_path:  document.getElementById('r-repo').value.trim() || '.',
-    verify:     document.getElementById('r-verify').checked,
-    publish_pr: document.getElementById('r-pr').checked,
-  };
-  clearLog();
-  setStatus('running','Running…');
-  document.getElementById('runBtn').disabled = true;
-  document.getElementById('resSection').style.display = 'none';
-  try {
-    const r = await fetch('/api/run', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-    if (!r.ok) throw new Error((await r.json()).detail);
-  } catch(e) { appendLog('❌ ' + e.message, 'bug'); setStatus('error','Error'); document.getElementById('runBtn').disabled = false; return; }
+/* ════════ Run ════════ */
+async function startRun(){
+  const url=document.getElementById('r-url').value.trim();
+  if(!url){alert('Enter a target URL.');return;}
+  const p={url,scenario:document.getElementById('r-sc').value.trim(),
+    repo_path:document.getElementById('r-rp').value.trim()||'.',
+    verify:document.getElementById('r-vf').checked,
+    publish_pr:document.getElementById('r-pr').checked};
+  clearLog();setSt('running','Running…');
+  document.getElementById('runBtn').disabled=true;
+  document.getElementById('resSec').style.display='none';
+  try{
+    const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+    if(!r.ok)throw new Error((await r.json()).detail);
+  }catch(e){alog('❌ '+e.message,'bug');setSt('error','Error');document.getElementById('runBtn').disabled=false;return;}
   openSSE();
 }
-
-function openSSE() {
-  if (sseConn) sseConn.close();
-  sseConn = new EventSource('/api/run/stream');
-  sseConn.onmessage = e => {
-    const d = JSON.parse(e.data);
-    if (d.line) appendLog(d.line);
-    if (d.done) { sseConn.close(); onDone(d.result); }
-  };
-  sseConn.onerror = () => { sseConn.close(); startPolling(); };
+function openSSE(){
+  if(sseConn)sseConn.close();
+  sseConn=new EventSource('/api/run/stream');
+  sseConn.onmessage=e=>{const d=JSON.parse(e.data);if(d.line)alog(d.line);if(d.done){sseConn.close();onDone(d.result);}};
+  sseConn.onerror=()=>{sseConn.close();startPoll();};
+}
+function startPoll(){
+  if(pollTmr)clearInterval(pollTmr);let last=0;
+  pollTmr=setInterval(async()=>{
+    try{const d=await fetch('/api/run/status').then(r=>r.json());
+      d.log.slice(last).forEach(l=>alog(l));last=d.log.length;
+      if(d.status!=='running'){clearInterval(pollTmr);onDone(d.result);}
+    }catch(_){}
+  },800);
+}
+function onDone(r){
+  document.getElementById('runBtn').disabled=false;
+  if(!r){setSt('error','Error');return;}
+  setSt(r.error&&!r.bug_found?'error':'done','Done');
+  showRes(r);loadHistory();loadTargets();
+  if(notifOk){const m=r.bug_found?`🐛 Bug (${r.severity}): ${r.summary||''}`:'✅ No bugs.';
+    new Notification('Bug Engine',{body:m});}
+}
+function showRes(r){
+  document.getElementById('resSec').style.display='';
+  const bEl=document.getElementById('rv-bg');
+  bEl.textContent=r.bug_found?'🐛 Yes':'✅ No';bEl.className='rv '+(r.bug_found?'crd':'cgr');
+  const sv=(r.severity||'none').toLowerCase();
+  document.getElementById('rv-sv').innerHTML=`<span class="sev sev-${sv}">${sv}</span>`;
+  const fEl=document.getElementById('rv-fx');
+  fEl.textContent=r.fixed?'✅ Yes':(r.bug_found?'❌ No':'—');fEl.className='rv '+(r.fixed?'cgr':r.bug_found?'crd':'cdm');
+  const sm=document.getElementById('rv-sm');if(r.summary){sm.textContent=r.summary;sm.style.display='';}
+  const pr=document.getElementById('rv-pr');if(r.pr_url){pr.href=r.pr_url;pr.textContent='🔗 '+r.pr_url;pr.style.display='flex';}
 }
 
-function startPolling() {
-  if (pollTimer) clearInterval(pollTimer);
-  let lastLen = 0;
-  pollTimer = setInterval(async () => {
-    try {
-      const d = await fetch('/api/run/status').then(r => r.json());
-      d.log.slice(lastLen).forEach(l => appendLog(l));
-      lastLen = d.log.length;
-      if (d.status !== 'running') { clearInterval(pollTimer); onDone(d.result); }
-    } catch(_) {}
-  }, 800);
+/* ════════ Console ════════ */
+function alog(line,cls){
+  const bd=document.getElementById('conBd');
+  const emp=bd.querySelector('.mt');if(emp)emp.remove();
+  if(!cls){if(/🐛|❌|💥/.test(line))cls='bug';else if(/🔧|📬|⚠/.test(line))cls='fix';
+    else if(/✅|🏁|🎉/.test(line))cls='ok';else if(/🚀|🔍|ℹ|⏰/.test(line))cls='info';}
+  const d=document.createElement('div');d.className='ll'+(cls?' '+cls:'');d.textContent=line;
+  bd.appendChild(d);bd.scrollTop=bd.scrollHeight;
+}
+function clearLog(){document.getElementById('conBd').innerHTML='<span class="ll mt">Output will appear here when a run starts…</span>';}
+function copyLog(){
+  const t=[...document.querySelectorAll('.ll:not(.mt)')].map(e=>e.textContent).join('\n');
+  navigator.clipboard.writeText(t).then(()=>{const b=event.target;b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',1500);});
 }
 
-function onDone(result) {
-  document.getElementById('runBtn').disabled = false;
-  if (!result) { setStatus('error','Error'); return; }
-  setStatus(result.error && !result.bug_found ? 'error' : 'done', 'Done');
-  showResult(result);
-  loadHistory();
-  // Browser notification
-  if (notifAllowed) {
-    const msg = result.bug_found
-      ? `🐛 Bug found (${result.severity}) — ${result.summary || ''}`
-      : '✅ No bugs detected.';
-    new Notification('Bug Engine', { body: msg, icon: '' });
-  }
+/* ════════ Status ════════ */
+function setSt(c,t){const b=document.getElementById('stBadge');b.className='status '+c;document.getElementById('stTxt').textContent=t;}
+async function refreshSt(){try{const d=await fetch('/api/run/status').then(r=>r.json());
+  if(d.status==='running')setSt('running','Running…');else if(d.status==='done')setSt('done','Done');
+  else if(d.status==='error')setSt('error','Error');else setSt('','Idle');}catch(_){}}
+
+/* ════════ Targets ════════ */
+let editTgId=null;
+async function loadTargets(){
+  try{const d=await fetch('/api/targets').then(r=>r.json());const tg=d.targets||[];
+    document.getElementById('tg-badge').textContent=tg.length?` (${tg.length})`:'';
+    const list=document.getElementById('tgList');
+    if(!tg.length){list.innerHTML='<div class="empty-state"><div class="em-ic">🎯</div>No targets yet.</div>';return;}
+    list.innerHTML=tg.map(t=>{
+      const sv=t.last_result||'none';
+      const lzc=sv==='none'?'lz-none':sv==='critical'||sv==='high'?'lz-bug':sv==='medium'?'lz-med':'lz-ok';
+      const lr=t.last_run?new Date(t.last_run).toLocaleDateString():'Never';
+      const tags=t.tags?.length?t.tags.map(tg=>`<span style="padding:1px 7px;border-radius:20px;background:var(--bg3);font-size:10px;margin-right:4px">${esc(tg)}</span>`).join(''):'';
+      return`<div class="tg-item">
+        <div class="tg-lz ${lzc}"></div>
+        <div class="tg-body">
+          <div class="tg-name">${esc(t.name||'Unnamed')}</div>
+          <div class="tg-url">${esc(t.url)}</div>
+          <div class="tg-meta">${tags}Last run: ${lr} ${t.last_result?'· <span class="sev sev-'+t.last_result+'">'+t.last_result+'</span>':''}</div>
+        </div>
+        <div class="tg-acts">
+          <button class="btn btn-p btn-sm" onclick="launchTarget('${t.id}')">▶ Run</button>
+          <button class="btn btn-g btn-sm" onclick="queueTarget('${t.id}')">Queue</button>
+          <button class="btn btn-g btn-sm" onclick="editTarget('${t.id}')">Edit</button>
+          <button class="btn btn-rd btn-sm" onclick="delTarget('${t.id}')">✕</button>
+        </div>
+      </div>`;}).join('');
+  }catch(e){console.warn(e)}
+}
+function openAddTarget(){editTgId=null;document.getElementById('tgFormTitle').textContent='➕ Add Target';
+  ['tg-name','tg-url','tg-sc','tg-tags','tg-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('tg-edit-id').value='';
+  document.getElementById('tgForm').style.display='';}
+function closeTargetForm(){document.getElementById('tgForm').style.display='none';}
+async function editTarget(id){
+  const d=await fetch('/api/targets').then(r=>r.json());
+  const t=d.targets.find(x=>x.id===id);if(!t)return;
+  editTgId=id;document.getElementById('tgFormTitle').textContent='✏️ Edit Target';
+  document.getElementById('tg-name').value=t.name||'';document.getElementById('tg-url').value=t.url||'';
+  document.getElementById('tg-sc').value=t.scenario||'';document.getElementById('tg-tags').value=(t.tags||[]).join(', ');
+  document.getElementById('tg-notes').value=t.notes||'';document.getElementById('tg-edit-id').value=id;
+  document.getElementById('tgForm').style.display='';
+}
+async function saveTarget(){
+  const url=document.getElementById('tg-url').value.trim();if(!url){alert('URL required.');return;}
+  const p={name:document.getElementById('tg-name').value.trim(),url,
+    scenario:document.getElementById('tg-sc').value.trim(),
+    notes:document.getElementById('tg-notes').value.trim(),
+    tags:document.getElementById('tg-tags').value.split(',').map(t=>t.trim()).filter(Boolean)};
+  const eid=document.getElementById('tg-edit-id').value;
+  if(eid){await fetch(`/api/targets/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});}
+  else{await fetch('/api/targets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});}
+  closeTargetForm();loadTargets();
+}
+async function delTarget(id){if(!confirm('Remove this target?'))return;await fetch(`/api/targets/${id}`,{method:'DELETE'});loadTargets();}
+async function launchTarget(id){
+  const d=await fetch('/api/targets').then(r=>r.json());const t=d.targets.find(x=>x.id===id);if(!t)return;
+  document.getElementById('r-url').value=t.url;document.getElementById('r-sc').value=t.scenario||'';
+  sw('run');await startRun();
+}
+async function queueTarget(id){
+  const d=await fetch('/api/targets').then(r=>r.json());const t=d.targets.find(x=>x.id===id);if(!t)return;
+  await fetch('/api/queue',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({url:t.url,scenario:t.scenario||'',repo_path:'.',verify:true,publish_pr:false})});
+  sw('queue');loadQueue();
 }
 
-/* ════════════════════════════════════════════════
-   Result display
-   ════════════════════════════════════════════════ */
-function showResult(r) {
-  document.getElementById('resSection').style.display = '';
-  const bugEl = document.getElementById('rv-bug');
-  bugEl.textContent = r.bug_found ? '🐛 Yes' : '✅ No';
-  bugEl.className   = 'rc-val ' + (r.bug_found ? 'c-red' : 'c-green');
-  const sev = (r.severity || 'none').toLowerCase();
-  document.getElementById('rv-sev').innerHTML = `<span class="sev sev-${sev}">${sev}</span>`;
-  const fixEl = document.getElementById('rv-fix');
-  fixEl.textContent = r.fixed ? '✅ Yes' : (r.bug_found ? '❌ No' : '—');
-  fixEl.className   = 'rc-val ' + (r.fixed ? 'c-green' : r.bug_found ? 'c-red' : 'c-dim');
-  const sumEl = document.getElementById('rv-sum');
-  if (r.summary) { sumEl.textContent = r.summary; sumEl.style.display = ''; }
-  const prEl = document.getElementById('rv-pr');
-  if (r.pr_url) { prEl.href = r.pr_url; prEl.textContent = '🔗 ' + r.pr_url; prEl.style.display = 'flex'; }
+/* ════════ Repos ════════ */
+async function loadRepos(){
+  try{const d=await fetch('/api/repos').then(r=>r.json());const repos=d.repos||[];
+    const list=document.getElementById('repoList');
+    if(!repos.length){list.innerHTML='<div class="empty-state" style="padding:20px 10px"><div class="em-ic" style="font-size:24px">📁</div>No repos added</div>';return;}
+    list.innerHTML=repos.map(r=>`<div class="repo-item${activeRepo&&activeRepo.id===r.id?' on':''}" onclick="selectRepo('${r.id}')">
+      <div class="repo-nm">${esc(r.name)}</div>
+      <div class="repo-path">${esc(r.local_path)}</div>
+      <div style="display:flex;gap:5px;margin-top:5px">
+        <button class="btn btn-rd btn-sm" style="padding:2px 7px;font-size:10px" onclick="event.stopPropagation();delRepo('${r.id}')">✕</button>
+        ${r.github_url?`<a href="${r.github_url}" target="_blank" class="btn btn-g btn-sm" style="padding:2px 7px;font-size:10px;text-decoration:none" onclick="event.stopPropagation()">GitHub ↗</a>`:''}
+      </div>
+    </div>`).join('');
+  }catch(e){console.warn(e)}
 }
-
-/* ════════════════════════════════════════════════
-   Console
-   ════════════════════════════════════════════════ */
-function appendLog(line, cls) {
-  const body = document.getElementById('conBody');
-  const emp = body.querySelector('.muted'); if (emp) emp.remove();
-  if (!cls) {
-    if (/🐛|❌|💥/.test(line)) cls = 'bug';
-    else if (/🔧|📬|⚠/.test(line))  cls = 'fix';
-    else if (/✅|🏁|🎉/.test(line))  cls = 'ok';
-    else if (/🚀|🔍|ℹ|⏰/.test(line))  cls = 'info';
-  }
-  const d = document.createElement('div');
-  d.className = 'll' + (cls ? ' ' + cls : '');
-  d.textContent = line;
-  body.appendChild(d);
-  body.scrollTop = body.scrollHeight;
+function openAddRepo(){document.getElementById('addRepoForm').style.display='';}
+async function saveRepo(){
+  const name=document.getElementById('rp-name').value.trim();
+  const local_path=document.getElementById('rp-path').value.trim();
+  if(!name||!local_path){alert('Name and path required.');return;}
+  const p={name,local_path,github_url:document.getElementById('rp-gh').value.trim(),branch:document.getElementById('rp-br').value.trim()||'main',description:''};
+  try{const r=await fetch('/api/repos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+    if(!r.ok){const e=await r.json();throw new Error(e.detail||'Error');}
+    document.getElementById('addRepoForm').style.display='none';
+    ['rp-name','rp-path','rp-gh'].forEach(id=>document.getElementById(id).value='');
+    loadRepos();
+  }catch(e){alert('Error: '+e.message);}
 }
-function clearLog() {
-  document.getElementById('conBody').innerHTML = '<span class="ll muted">Output will appear here when a run starts…</span>';
+async function delRepo(id){
+  if(!confirm('Remove repo?'))return;
+  await fetch(`/api/repos/${id}`,{method:'DELETE'});
+  if(activeRepo&&activeRepo.id===id){activeRepo=null;resetEditor();}
+  loadRepos();
 }
-function copyLog() {
-  const lines = [...document.querySelectorAll('.ll:not(.muted)')].map(e => e.textContent).join('\n');
-  navigator.clipboard.writeText(lines).then(() => { const b=event.target; b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',1500); });
+async function selectRepo(id){
+  const d=await fetch('/api/repos').then(r=>r.json());
+  activeRepo=d.repos.find(r=>r.id===id)||null;
+  curPath='.';openFile=null;
+  if(activeRepo){browseDir('.');document.getElementById('gitBar').style.display='';}
+  loadRepos();
 }
-
-/* ════════════════════════════════════════════════
-   Status badge
-   ════════════════════════════════════════════════ */
-function setStatus(cls, txt) {
-  const b = document.getElementById('statusBadge');
-  b.className = 'status ' + cls;
-  document.getElementById('statusTxt').textContent = txt;
+function resetEditor(){
+  document.getElementById('repoBody').innerHTML='<div class="no-repo"><span style="font-size:36px">📁</span><span>Select a repository.</span></div>';
+  document.getElementById('gitBar').style.display='none';document.getElementById('navUpBtn').style.display='none';document.getElementById('newFileBtn').style.display='none';
+  document.getElementById('gitOut').classList.remove('show');
+  document.getElementById('breadcrumb').textContent='Select a repository →';
 }
-async function refreshStatus() {
-  try {
-    const d = await fetch('/api/run/status').then(r => r.json());
-    if (d.status === 'running') setStatus('running','Running…');
-    else if (d.status === 'done') setStatus('done','Done');
-    else if (d.status === 'error') setStatus('error','Error');
-    else setStatus('', 'Idle');
-  } catch(_) {}
+async function browseDir(path){
+  if(!activeRepo)return;
+  curPath=path;openFile=null;
+  try{
+    const d=await fetch(`/api/repos/${activeRepo.id}/tree?path=${encodeURIComponent(path)}`).then(r=>r.json());
+    updateBreadcrumb(path);
+    document.getElementById('navUpBtn').style.display=path==='.'?'none':'';
+    document.getElementById('newFileBtn').style.display='';
+    const entries=d.entries||[];
+    if(!entries.length){renderEditor('',path,'(empty directory)');return;}
+    const tree=document.createElement('div');tree.className='file-tree';
+    entries.forEach(e=>{
+      const el=document.createElement('div');el.className='fe'+(e.type==='dir'?' dir':'');
+      const ic=e.type==='dir'?'📁':fileIcon(e.ext||'');
+      el.innerHTML=`<span class="fe-ic">${ic}</span><span class="fe-nm">${esc(e.name)}</span>${e.size!=null?`<span class="fe-sz">${fmt(e.size)}</span>`:''}`;
+      el.onclick=()=>e.type==='dir'?browseDir(e.path):openFileEditor(e.path);
+      tree.appendChild(el);
+    });
+    const ea=document.createElement('div');ea.className='editor-area';
+    ea.innerHTML='<div style="display:flex;align-items:center;justify-content:center;flex:1;color:var(--tm);font-size:12px;padding:20px">← Select a file to edit</div>';
+    document.getElementById('repoBody').innerHTML='';
+    document.getElementById('repoBody').appendChild(tree);
+    document.getElementById('repoBody').appendChild(ea);
+  }catch(e){console.error(e)}
 }
-
-/* ════════════════════════════════════════════════
-   Schedule
-   ════════════════════════════════════════════════ */
-function setSMode(m) {
-  schedMode = m;
-  document.getElementById('smode-interval').classList.toggle('on', m === 'interval');
-  document.getElementById('smode-cron').classList.toggle('on',     m === 'cron');
-  document.getElementById('interval-mode').style.display = m === 'interval' ? '' : 'none';
-  document.getElementById('cron-mode').style.display      = m === 'cron'    ? '' : 'none';
+async function openFileEditor(path){
+  if(!activeRepo)return;openFile=path;
+  try{
+    const d=await fetch(`/api/repos/${activeRepo.id}/file?path=${encodeURIComponent(path)}`).then(r=>r.json());
+    // highlight active file
+    document.querySelectorAll('.fe').forEach(el=>el.classList.remove('on'));
+    document.querySelectorAll('.fe').forEach(el=>{if(el.querySelector('.fe-nm')?.textContent===path.split('/').pop())el.classList.add('on');});
+    renderEditor(d.binary?'(binary file — cannot edit)':d.content||'', path, d.binary?'binary':'', d);
+  }catch(e){console.error(e)}
 }
-function setInterval(mins) {
-  document.getElementById('s-interval').value = mins;
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('on'));
-  event.target.classList.add('on');
-}
-function setCron(expr) {
-  document.getElementById('s-cron').value = expr;
-  document.querySelectorAll('#cron-mode .preset-btn').forEach(b => b.classList.remove('on'));
-  event.target.classList.add('on');
-}
-async function saveSchedule() {
-  const url = document.getElementById('s-url').value.trim();
-  if (!url) { alert('Enter a target URL for scheduling.'); return; }
-  const payload = {
-    mode: schedMode,
-    interval_minutes: schedMode === 'interval' ? +document.getElementById('s-interval').value : null,
-    cron_expression:  schedMode === 'cron'     ? document.getElementById('s-cron').value.trim() : null,
-    url,
-    scenario:   document.getElementById('s-scenario').value.trim(),
-    repo_path:  document.getElementById('s-repo').value.trim() || '.',
-    verify:     document.getElementById('s-verify').checked,
-    publish_pr: document.getElementById('s-pr').checked,
-  };
-  try {
-    const r = await fetch('/api/schedule', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
-    updateSchedBanner(d);
-    setStatus('scheduled', 'Scheduled');
-    alert('✅ Schedule activated!\nNext run: ' + (d.next_run ? new Date(d.next_run).toLocaleString() : 'pending'));
-  } catch(e) { alert('Error: ' + e.message); }
-}
-async function disableSchedule() {
-  await fetch('/api/schedule', { method:'DELETE' });
-  document.getElementById('sched-active').classList.add('hidden');
-  setStatus('', 'Idle');
-}
-async function runScheduledNow() {
-  const url = document.getElementById('s-url').value.trim();
-  if (!url) { alert('Enter a target URL first.'); return; }
-  document.getElementById('r-url').value = url;
-  document.getElementById('r-scenario').value = document.getElementById('s-scenario').value;
-  switchTab('run');
-  await startRun();
-}
-async function loadSchedule() {
-  try {
-    const d = await fetch('/api/schedule').then(r => r.json());
-    if (d.mode && d.mode !== 'disabled') {
-      setSMode(d.mode);
-      if (d.interval_minutes) document.getElementById('s-interval').value = d.interval_minutes;
-      if (d.cron_expression)  document.getElementById('s-cron').value = d.cron_expression;
-      if (d.url) document.getElementById('s-url').value = d.url;
-      if (d.scenario) document.getElementById('s-scenario').value = d.scenario;
-      if (d.repo_path) document.getElementById('s-repo').value = d.repo_path;
-      document.getElementById('s-verify').checked = !!d.verify;
-      document.getElementById('s-pr').checked = !!d.publish_pr;
-      updateSchedBanner(d);
-    }
-  } catch(_) {}
-}
-function updateSchedBanner(d) {
-  const bar = document.getElementById('sched-active');
-  bar.classList.remove('hidden');
-  const next = d.next_run ? new Date(d.next_run).toLocaleString() : '…';
-  document.getElementById('sched-next-txt').textContent = `Next run: ${next}`;
-}
-
-/* ════════════════════════════════════════════════
-   Queue
-   ════════════════════════════════════════════════ */
-function runFromQueue() {
-  const url = document.getElementById('r-url').value.trim();
-  if (!url) { alert('Enter a URL first.'); return; }
-  addItemToQueue();
-}
-async function addToQueue() {
-  const url = document.getElementById('r-url').value.trim();
-  if (!url) { alert('Enter a target URL first.'); return; }
-  await _addQItem({
-    url, scenario: document.getElementById('r-scenario').value.trim(),
-    repo_path: document.getElementById('r-repo').value.trim() || '.',
-    verify: document.getElementById('r-verify').checked,
-    publish_pr: document.getElementById('r-pr').checked,
+function renderEditor(content,path,hint,meta){
+  // find or create editor area
+  let ea=document.querySelector('.editor-area');
+  if(!ea){ea=document.createElement('div');ea.className='editor-area';document.getElementById('repoBody').appendChild(ea);}
+  const fname=path.split('/').pop();const ext=(fname.includes('.')?fname.split('.').pop():'').toLowerCase();
+  const lines=meta?.lines||content.split('\n').length;const sz=meta?.size?fmt(meta.size):'';
+  ea.innerHTML=`
+    <div class="editor-hd">
+      <div class="ed-file">${esc(fname)}</div>
+      <div class="ed-meta">${lines} lines · ${sz}</div>
+      <button class="btn btn-p btn-sm" onclick="saveFile()">💾 Save</button>
+    </div>
+    <textarea class="editor" id="codeEditor" spellcheck="false">${esc(content)}</textarea>`;
+  // tab key support
+  document.getElementById('codeEditor').addEventListener('keydown',e=>{
+    if(e.key==='Tab'){e.preventDefault();const t=e.target,s=t.selectionStart,en=t.selectionEnd;
+      t.value=t.value.substring(0,s)+'  '+t.value.substring(en);t.selectionStart=t.selectionEnd=s+2;}
   });
-  switchTab('queue');
 }
-async function addItemToQueue() {
-  const url = document.getElementById('qa-url').value.trim();
-  if (!url) { alert('Enter a URL.'); return; }
-  await _addQItem({
-    url, scenario: document.getElementById('qa-scenario').value.trim(),
-    repo_path: '.', verify: document.getElementById('qa-verify').checked,
-    publish_pr: document.getElementById('qa-pr').checked,
-  });
-  document.getElementById('qa-url').value = '';
+async function saveFile(){
+  if(!activeRepo||!openFile)return;
+  const content=document.getElementById('codeEditor')?.value;if(content==null)return;
+  try{const r=await fetch(`/api/repos/${activeRepo.id}/file`,{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({path:openFile,content})});
+    const d=await r.json();if(d.ok)showGitOut('✓ Saved '+openFile);
+  }catch(e){showGitOut('❌ Save failed: '+e.message);}
 }
-async function _addQItem(item) {
-  const r = await fetch('/api/queue', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(item) });
-  if (r.ok) loadQueue();
+function newFile(){
+  const name=prompt('New file path (relative to repo root):');if(!name||!activeRepo)return;
+  openFile=name;renderEditor('',name,'new');
 }
-async function removeFromQueue(id) {
-  await fetch(`/api/queue/${id}`, { method:'DELETE' });
-  loadQueue();
+function navUp(){
+  if(!curPath||curPath==='.')return;const parts=curPath.split('/');parts.pop();browseDir(parts.join('/')||'.');}
+function updateBreadcrumb(path){
+  const bc=document.getElementById('breadcrumb');
+  if(path==='.'){bc.innerHTML=`<span onclick="browseDir('.')">${activeRepo?.name||'root'}</span>`;return;}
+  const parts=path.split('/');let cum='.';
+  bc.innerHTML=`<span onclick="browseDir('.')">${activeRepo?.name||'root'}</span>`+
+    parts.map(p=>{cum=(cum==='.'?p:cum+'/'+p);const c=cum;return`<span class="sep">/</span><span onclick="browseDir('${c}')">${esc(p)}</span>`;}).join('');
 }
-async function clearQueue() {
-  const q = await fetch('/api/queue').then(r => r.json());
-  await Promise.all(q.queue.map(i => fetch(`/api/queue/${i.id}`, { method:'DELETE' })));
-  loadQueue();
+async function gitOp(op){
+  if(!activeRepo)return;
+  const msg=document.getElementById('git-msg').value.trim()||'chore: edit via Bug Engine UI';
+  try{const d=await fetch(`/api/repos/${activeRepo.id}/git`,{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({op,message:msg})}).then(r=>r.json());
+    showGitOut(d.output||d.error||'Done');
+  }catch(e){showGitOut('❌ '+e.message);}
 }
-async function runQueue() {
-  const btn = document.getElementById('runQueueBtn');
-  btn.disabled = true;
-  clearLog(); setStatus('running','Running queue…');
-  switchTab('run');
-  try {
-    const r = await fetch('/api/queue/run', { method:'POST' });
-    if (!r.ok) throw new Error((await r.json()).detail);
-    openSSE();
-  } catch(e) { appendLog('❌ ' + e.message,'bug'); setStatus('error','Error'); btn.disabled = false; }
+function showGitOut(txt){const el=document.getElementById('gitOut');el.textContent=txt;el.classList.add('show');}
+
+/* ════════ Automate ════════ */
+let schedMode='interval';
+function setSM(m){schedMode=m;['iv','cr'].forEach(k=>document.getElementById(`sm-${k}`).classList.toggle('on',k===m[0]));
+  document.getElementById('iv-mode').style.display=m==='interval'?'':'none';
+  document.getElementById('cr-mode').style.display=m==='cron'?'':'none';}
+function setIv(n,el){document.getElementById('s-iv').value=n;document.querySelectorAll('#iv-mode .pb').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+function setCron(expr,el){document.getElementById('s-cr').value=expr;document.querySelectorAll('#cr-mode .pb').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+async function saveSched(){
+  const url=document.getElementById('s-url').value.trim();if(!url){alert('Enter a URL.');return;}
+  const p={mode:schedMode,interval_minutes:schedMode==='interval'?+document.getElementById('s-iv').value:null,
+    cron_expression:schedMode==='cron'?document.getElementById('s-cr').value.trim():null,
+    url,scenario:document.getElementById('s-sc').value.trim(),repo_path:document.getElementById('s-rp').value.trim()||'.',
+    verify:document.getElementById('s-vf').checked,publish_pr:document.getElementById('s-pr').checked};
+  try{const r=await fetch('/api/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+    const d=await r.json();if(!r.ok)throw new Error(d.detail);
+    updateSchedBar(d);setSt('sched','Scheduled');
+    alert('✅ Scheduled! Next: '+(d.next_run?new Date(d.next_run).toLocaleString():'pending'));
+  }catch(e){alert('Error: '+e.message);}
 }
-async function loadQueue() {
-  try {
-    const d = await fetch('/api/queue').then(r => r.json());
-    const q = d.queue || [];
-    const badge = document.getElementById('q-badge');
-    badge.textContent = q.length ? ` (${q.length})` : '';
-    const list = document.getElementById('queueList');
-    if (!q.length) { list.innerHTML = '<div class="q-empty">No URLs in queue.</div>'; return; }
-    list.innerHTML = q.map((item, i) => `
-      <div class="q-item">
-        <div class="q-num">${i+1}</div>
-        <div class="q-info">
-          <div class="q-url">${escHtml(item.url)}</div>
-          <div class="q-meta">
-            ${item.verify ? '✓ verify' : ''} ${item.publish_pr ? '· PR' : ''}
-            ${item.scenario ? '· ' + escHtml(item.scenario.slice(0,60)) + '…' : ''}
-          </div>
-        </div>
-        <button class="q-del" onclick="removeFromQueue('${item.id}')" title="Remove">✕</button>
-      </div>`).join('');
-  } catch(_) {}
+async function disableSched(){await fetch('/api/schedule',{method:'DELETE'});document.getElementById('sched-bar').style.display='none';setSt('','Idle');}
+async function runSchedNow(){const url=document.getElementById('s-url').value.trim();if(!url){alert('Enter URL.');return;}
+  document.getElementById('r-url').value=url;document.getElementById('r-sc').value=document.getElementById('s-sc').value;
+  sw('run');startRun();}
+async function loadSchedule(){
+  try{const d=await fetch('/api/schedule').then(r=>r.json());
+    if(d.mode&&d.mode!=='disabled'){setSM(d.mode);
+      if(d.interval_minutes)document.getElementById('s-iv').value=d.interval_minutes;
+      if(d.cron_expression)document.getElementById('s-cr').value=d.cron_expression;
+      if(d.url)document.getElementById('s-url').value=d.url;
+      if(d.scenario)document.getElementById('s-sc').value=d.scenario;
+      if(d.repo_path)document.getElementById('s-rp').value=d.repo_path;
+      document.getElementById('s-vf').checked=!!d.verify;document.getElementById('s-pr').checked=!!d.publish_pr;
+      updateSchedBar(d);}
+  }catch(_){}
+}
+function updateSchedBar(d){const bar=document.getElementById('sched-bar');bar.style.display='';
+  document.getElementById('sched-next').textContent='Next: '+(d.next_run?new Date(d.next_run).toLocaleString():'pending');}
+
+/* ════════ Queue ════════ */
+async function loadQueue(){
+  try{const d=await fetch('/api/queue').then(r=>r.json());const q=d.queue||[];
+    document.getElementById('q-badge').textContent=q.length?` (${q.length})`:'';
+    const list=document.getElementById('qList');
+    if(!q.length){list.innerHTML='<div class="empty-state"><div class="em-ic">📋</div>Queue is empty.</div>';return;}
+    list.innerHTML=q.map((it,i)=>`<div class="qi"><div class="qi-num">${i+1}</div>
+      <div class="qi-body"><div class="qi-url">${esc(it.url)}</div>
+      <div class="qi-meta">${it.verify?'✓ verify ':''} ${it.publish_pr?'· PR':''} ${it.scenario?'· '+esc(it.scenario.slice(0,50)):''}
+      </div></div><button class="qi-del" onclick="delQItem('${it.id}')">✕</button></div>`).join('');
+  }catch(_){}
+}
+async function addToQueue(){
+  const url=document.getElementById('r-url').value.trim();if(!url){alert('Enter URL first.');return;}
+  await fetch('/api/queue',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({url,scenario:document.getElementById('r-sc').value.trim(),
+      repo_path:document.getElementById('r-rp').value.trim()||'.',
+      verify:document.getElementById('r-vf').checked,publish_pr:document.getElementById('r-pr').checked})});
+  sw('queue');loadQueue();
+}
+async function addQItem(){
+  const url=document.getElementById('qa-url').value.trim();if(!url){alert('Enter URL.');return;}
+  await fetch('/api/queue',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({url,scenario:document.getElementById('qa-sc').value.trim(),repo_path:'.',
+      verify:document.getElementById('qa-vf').checked,publish_pr:document.getElementById('qa-pr').checked})});
+  document.getElementById('qa-url').value='';loadQueue();
+}
+async function delQItem(id){await fetch(`/api/queue/${id}`,{method:'DELETE'});loadQueue();}
+async function clearQueue(){const d=await fetch('/api/queue').then(r=>r.json());
+  await Promise.all((d.queue||[]).map(i=>fetch(`/api/queue/${i.id}`,{method:'DELETE'})));loadQueue();}
+async function runQueue(){
+  const btn=document.getElementById('rqBtn');btn.disabled=true;
+  clearLog();setSt('running','Running queue…');sw('run');
+  try{const r=await fetch('/api/queue/run',{method:'POST'});if(!r.ok)throw new Error((await r.json()).detail);openSSE();}
+  catch(e){alog('❌ '+e.message,'bug');setSt('error','Error');btn.disabled=false;}
 }
 
-/* ════════════════════════════════════════════════
-   History
-   ════════════════════════════════════════════════ */
-async function loadHistory() {
-  try {
-    const d = await fetch('/api/history').then(r => r.json());
-    const h = d.history || [];
-    const list = document.getElementById('histList');
-    if (!h.length) { list.innerHTML = '<div class="h-empty">No runs yet.</div>'; return; }
-    list.innerHTML = h.map(r => {
-      const icon = r.error ? '💥' : r.bug_found ? (r.fixed ? '🔧' : '🐛') : '✅';
-      const sev  = (r.severity || 'none').toLowerCase();
-      const ts   = r.timestamp ? new Date(r.timestamp).toLocaleString() : '';
-      return `
-      <div class="h-item">
-        <div class="h-icon">${icon}</div>
-        <div class="h-body">
-          <div class="h-url">${escHtml(r.url)}</div>
-          <div class="h-sum">
-            <span class="sev sev-${sev}">${sev}</span>
-            ${r.summary ? ' · ' + escHtml(r.summary.slice(0,80)) : ''}
-            ${r.error   ? ' · <span style="color:var(--red)">' + escHtml(r.error.slice(0,60)) + '</span>' : ''}
-          </div>
+/* ════════ History ════════ */
+async function loadHistory(){
+  try{const d=await fetch('/api/history').then(r=>r.json());const h=d.history||[];
+    const list=document.getElementById('histList');
+    if(!h.length){list.innerHTML='<div class="empty-state"><div class="em-ic">🕘</div>No runs yet.</div>';return;}
+    list.innerHTML=h.map(r=>{
+      const ic=r.error?'💥':r.bug_found?(r.fixed?'🔧':'🐛'):'✅';
+      const sv=(r.severity||'none').toLowerCase();const ts=r.timestamp?new Date(r.timestamp).toLocaleString():'';
+      return`<div class="hi"><div class="hi-ic">${ic}</div>
+        <div><div class="hi-nm">${esc(r.url)}</div>
+          <div class="hi-s"><span class="sev sev-${sv}">${sv}</span> ${r.summary?'· '+esc(r.summary.slice(0,80)):''}</div>
         </div>
-        <div class="h-meta">
-          <div class="h-ts">${ts}</div>
-          ${r.pr_url ? `<a class="h-pr" href="${r.pr_url}" target="_blank">View PR →</a>` : ''}
-        </div>
-      </div>`;
-    }).join('');
-  } catch(_) {}
+        <div><div class="hi-ts">${ts}</div>${r.pr_url?`<a class="hi-pr" href="${r.pr_url}" target="_blank">PR →</a>`:''}</div>
+      </div>`;}).join('');
+  }catch(_){}
 }
-async function clearHistory() {
-  if (!confirm('Clear all history?')) return;
-  await fetch('/api/history', { method:'DELETE' });
-  loadHistory();
-}
+async function clearHist(){if(!confirm('Clear all history?'))return;await fetch('/api/history',{method:'DELETE'});loadHistory();}
 
-/* ════════════════════════════════════════════════
-   Notifications
-   ════════════════════════════════════════════════ */
-function checkNotifPerm() {
-  if (!('Notification' in window)) return;
-  notifAllowed = Notification.permission === 'granted';
-  const s = document.getElementById('notifStatus');
-  const b = document.getElementById('notifBtn');
-  if (notifAllowed) { s.textContent = '✓ Enabled'; b.textContent = 'Notifications On'; b.disabled = true; }
-  else if (Notification.permission === 'denied') { s.textContent = '✗ Blocked by browser'; }
-}
-async function requestNotifPerm() {
-  if (!('Notification' in window)) { alert('Browser notifications not supported.'); return; }
-  const perm = await Notification.requestPermission();
-  notifAllowed = perm === 'granted';
-  checkNotifPerm();
-}
+/* ════════ Notifications ════════ */
+function checkNotif(){if(!('Notification'in window))return;notifOk=Notification.permission==='granted';const s=document.getElementById('notifSt'),b=document.getElementById('notifBtn');
+  if(notifOk){s.textContent='✓ Enabled';b.textContent='On ✓';b.disabled=true;}else if(Notification.permission==='denied')s.textContent='✗ Blocked by browser';}
+async function reqNotif(){if(!('Notification'in window)){alert('Not supported.');return;}
+  const p=await Notification.requestPermission();notifOk=p==='granted';checkNotif();}
 
-/* ════════════════════════════════════════════════
-   Util
-   ════════════════════════════════════════════════ */
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+/* ════════ Helpers ════════ */
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmt(b){if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';}
+function fileIcon(ext){const m={'py':'🐍','js':'🟨','ts':'🔷','tsx':'🔷','jsx':'🟨','html':'🌐','css':'🎨','scss':'🎨',
+  'json':'📋','md':'📝','yaml':'⚙️','yml':'⚙️','sh':'⚡','sql':'🗄️','go':'🐹','rs':'🦀','java':'☕',
+  'env':'🔒','gitignore':'🚫','lock':'🔒','toml':'⚙️'};return m[ext]||'📄';}
 </script>
 </body>
 </html>
