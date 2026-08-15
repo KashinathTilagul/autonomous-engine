@@ -4,427 +4,297 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Autonomous UI Bug Engine</title>
-  <meta name="description" content="AI-powered autonomous UI bug detection and auto-fix engine with headless browsing and OpenHands code repair." />
+  <meta name="description" content="AI-powered autonomous UI bug detection, scheduling, queuing and auto-fix with GitHub PRs." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
-    /* ── Reset & Tokens ──────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:          #0c0e14;
-      --bg-1:        #131620;
-      --bg-2:        #1a1e2e;
-      --bg-3:        #222840;
-      --border:      rgba(255,255,255,.07);
-      --border-hi:   rgba(99,179,237,.3);
-      --text:        #e2e8f0;
-      --text-dim:    #7a869a;
-      --text-muted:  #4a5568;
-      --accent:      #63b3ed;
-      --accent-glow: rgba(99,179,237,.15);
-      --green:       #48bb78;
-      --red:         #fc8181;
-      --yellow:      #f6e05e;
-      --radius:      10px;
-      --radius-lg:   16px;
-      --shadow:      0 4px 24px rgba(0,0,0,.4);
-      --transition:  all .18s cubic-bezier(.4,0,.2,1);
+      --bg:         #0c0e14;
+      --bg-1:       #131620;
+      --bg-2:       #1a1e2e;
+      --bg-3:       #222840;
+      --border:     rgba(255,255,255,.07);
+      --border-hi:  rgba(99,179,237,.3);
+      --text:       #e2e8f0;
+      --text-dim:   #7a869a;
+      --text-muted: #4a5568;
+      --accent:     #63b3ed;
+      --accent-g:   rgba(99,179,237,.14);
+      --green:      #48bb78;
+      --red:        #fc8181;
+      --yellow:     #f6e05e;
+      --orange:     #f6ad55;
+      --purple:     #b794f4;
+      --r:          10px;
+      --r-lg:       16px;
+      --tr:         all .17s cubic-bezier(.4,0,.2,1);
     }
 
-    html, body { height: 100%; }
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-      font-size: 14px;
-      line-height: 1.6;
-    }
+    html, body { height: 100%; font-size: 14px; line-height: 1.6; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
 
-    /* ── Layout ──────────────────────────────────────────────────── */
-    .app { display: flex; flex: 1; overflow: hidden; height: 100vh; }
+    /* ── Layout ──────────────────────────────────────── */
+    .app { display: flex; flex: 1; height: 100vh; overflow: hidden; }
 
     /* Sidebar */
     .sidebar {
-      width: 340px;
-      min-width: 300px;
+      width: 320px; min-width: 280px;
       background: var(--bg-1);
       border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
+      display: flex; flex-direction: column; overflow: hidden;
     }
-    .sidebar-header {
-      padding: 20px 24px 16px;
+    .sidebar-head {
+      padding: 18px 20px 14px;
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 4px;
-    }
+    .logo { display: flex; align-items: center; gap: 10px; }
     .logo-icon {
-      width: 32px; height: 32px;
-      background: linear-gradient(135deg, #63b3ed, #4299e1);
-      border-radius: 8px;
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, #63b3ed 0%, #4299e1 100%);
       display: flex; align-items: center; justify-content: center;
-      font-size: 16px;
-      box-shadow: 0 0 16px rgba(99,179,237,.3);
+      font-size: 15px; box-shadow: 0 0 18px rgba(99,179,237,.28);
     }
-    .logo h1 { font-size: 15px; font-weight: 700; letter-spacing: -.3px; }
-    .logo-sub { font-size: 11px; color: var(--text-dim); margin-left: 42px; }
-    .sidebar-scroll { flex: 1; overflow-y: auto; padding: 16px; }
-    .sidebar-scroll::-webkit-scrollbar { width: 4px; }
-    .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-    .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
+    .logo-name { font-size: 14px; font-weight: 700; letter-spacing: -.3px; }
+    .logo-sub  { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+    .sidebar-scroll { flex: 1; overflow-y: auto; padding: 14px; }
+    .sidebar-scroll::-webkit-scrollbar { width: 3px; }
+    .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
+    .sidebar-foot {
+      padding: 12px 14px; border-top: 1px solid var(--border);
+      flex-shrink: 0; display: flex; flex-direction: column; gap: 7px;
+    }
+    .save-note { font-size: 11px; color: var(--green); text-align: center; height: 14px; opacity: 0; transition: opacity .3s; }
+    .save-note.show { opacity: 1; }
 
-    /* Main panel */
-    .main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      background: var(--bg);
-    }
-    .topbar {
-      padding: 16px 28px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-shrink: 0;
-      background: var(--bg-1);
-    }
-    .topbar h2 { font-size: 14px; font-weight: 600; color: var(--text-dim); }
-    .status-badge {
-      display: flex; align-items: center; gap: 6px;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 500;
-      background: var(--bg-2);
-      border: 1px solid var(--border);
-      transition: var(--transition);
-    }
-    .status-dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: var(--text-muted);
-    }
-    .status-badge.running .status-dot { background: var(--accent); animation: pulse 1.2s infinite; }
-    .status-badge.done    .status-dot { background: var(--green); }
-    .status-badge.error   .status-dot { background: var(--red); }
-    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
-
-    .main-content { flex: 1; overflow-y: auto; padding: 24px 28px; }
-
-    /* ── Components ───────────────────────────────────────────────── */
-    .card {
-      background: var(--bg-1);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 20px;
-      margin-bottom: 16px;
-    }
-    .card-title {
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      color: var(--text-dim);
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .card-title .icon { font-size: 14px; }
-
-    /* Accordion sections in sidebar */
-    .section { margin-bottom: 4px; }
-    .section-header {
+    /* Accordion */
+    .acc { margin-bottom: 3px; }
+    .acc-hd {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 12px;
-      border-radius: var(--radius);
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .07em;
-      color: var(--text-dim);
-      background: transparent;
-      border: none;
-      width: 100%;
-      text-align: left;
-      transition: var(--transition);
+      padding: 9px 11px; border-radius: var(--r);
+      cursor: pointer; width: 100%; background: transparent; border: none;
+      font: 600 11px/1 'Inter', sans-serif; text-transform: uppercase; letter-spacing: .07em;
+      color: var(--text-dim); transition: var(--tr);
     }
-    .section-header:hover { background: var(--bg-2); color: var(--text); }
-    .section-header .chevron { transition: transform .2s; font-size: 10px; }
-    .section-header.open .chevron { transform: rotate(180deg); }
-    .section-body { padding: 0 4px 8px; display: none; }
-    .section-body.open { display: block; }
-
-    /* Form elements */
-    .field { margin-bottom: 12px; }
-    .field label {
-      display: block;
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--text-dim);
-      margin-bottom: 5px;
-      letter-spacing: .03em;
-    }
-    .field input, .field select, .field textarea {
-      width: 100%;
-      background: var(--bg-2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 13px;
-      padding: 8px 11px;
-      outline: none;
-      transition: var(--transition);
-    }
-    .field input:focus, .field select:focus, .field textarea:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-glow);
-    }
-    .field input[type="password"] { font-family: 'JetBrains Mono', monospace; letter-spacing: .15em; }
-    .field select { appearance: none; cursor: pointer; }
-    .field textarea { resize: vertical; min-height: 80px; }
-    .field-hint { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+    .acc-hd:hover { background: var(--bg-2); color: var(--text); }
+    .acc-hd.open  { color: var(--accent); }
+    .acc-hd .ch { transition: transform .2s; font-size: 9px; }
+    .acc-hd.open .ch { transform: rotate(180deg); }
+    .acc-bd { padding: 2px 4px 10px; display: none; }
+    .acc-bd.open { display: block; }
 
     /* Provider toggle */
-    .provider-toggle {
-      display: flex;
-      background: var(--bg-2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 3px;
-      gap: 3px;
-      margin-bottom: 14px;
+    .prov-wrap { display: flex; gap: 3px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r); padding: 3px; margin-bottom: 12px; }
+    .prov-btn { flex: 1; padding: 6px; border-radius: 7px; border: none; background: transparent; color: var(--text-dim); font: 500 12px 'Inter',sans-serif; cursor: pointer; transition: var(--tr); }
+    .prov-btn.on { background: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(99,179,237,.3); }
+
+    /* Fields */
+    .f { margin-bottom: 10px; }
+    .f label { display: block; font-size: 11px; font-weight: 500; color: var(--text-dim); margin-bottom: 4px; }
+    .f input, .f select, .f textarea {
+      width: 100%; background: var(--bg-2); border: 1px solid var(--border);
+      border-radius: var(--r); color: var(--text); font-family: inherit; font-size: 13px;
+      padding: 7px 10px; outline: none; transition: var(--tr);
     }
-    .provider-btn {
-      flex: 1; padding: 7px 8px;
-      border-radius: 7px;
-      border: none;
-      background: transparent;
-      color: var(--text-dim);
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: var(--transition);
-      text-align: center;
+    .f input:focus, .f select:focus, .f textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-g); }
+    .f input[type=password] { font-family: 'JetBrains Mono',monospace; letter-spacing: .12em; }
+    .f select { appearance: none; cursor: pointer; }
+    .f textarea { resize: vertical; min-height: 72px; }
+    .f-hint { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+
+    /* ── Main ────────────────────────────────────────── */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Topbar */
+    .topbar {
+      padding: 0 24px; height: 52px;
+      background: var(--bg-1); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
     }
-    .provider-btn.active {
-      background: var(--accent);
-      color: #fff;
-      box-shadow: 0 2px 8px rgba(99,179,237,.35);
+
+    /* Tab nav */
+    .tabs { display: flex; gap: 2px; }
+    .tab {
+      padding: 6px 14px; border-radius: 7px; border: none;
+      background: transparent; color: var(--text-dim); font: 500 13px 'Inter',sans-serif;
+      cursor: pointer; transition: var(--tr);
     }
+    .tab:hover { color: var(--text); background: var(--bg-2); }
+    .tab.on { background: var(--accent-g); color: var(--accent); }
+
+    /* Status */
+    .status {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+      background: var(--bg-2); border: 1px solid var(--border); transition: var(--tr);
+    }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
+    .status.running .dot { background: var(--accent); animation: blink 1.2s infinite; }
+    .status.done    .dot { background: var(--green); }
+    .status.error   .dot { background: var(--red); }
+    .status.scheduled .dot { background: var(--purple); animation: blink 2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1}50%{opacity:.35} }
+
+    /* Tab panels */
+    .panel { flex: 1; overflow-y: auto; padding: 22px 24px; display: none; }
+    .panel.on { display: block; }
+    .panel::-webkit-scrollbar { width: 4px; }
+    .panel::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
+
+    /* Cards */
+    .card { background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px; margin-bottom: 14px; }
+    .card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); margin-bottom: 14px; display: flex; align-items: center; gap: 7px; }
 
     /* Buttons */
-    .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-      padding: 9px 18px;
-      border-radius: var(--radius);
-      border: none;
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: var(--transition);
-    }
-    .btn-primary {
-      background: var(--accent);
-      color: #fff;
-      box-shadow: 0 2px 12px rgba(99,179,237,.3);
-    }
-    .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    .btn-primary:active { transform: translateY(0); }
-    .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-    .btn-ghost {
-      background: var(--bg-2);
-      color: var(--text-dim);
-      border: 1px solid var(--border);
-    }
-    .btn-ghost:hover { background: var(--bg-3); color: var(--text); }
-    .btn-danger {
-      background: rgba(252,129,129,.15);
-      color: var(--red);
-      border: 1px solid rgba(252,129,129,.2);
-    }
-    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px; border-radius: var(--r); border: none; font: 600 13px 'Inter',sans-serif; cursor: pointer; transition: var(--tr); }
+    .btn-p { background: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(99,179,237,.25); }
+    .btn-p:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-p:active { transform: none; }
+    .btn-p:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+    .btn-g { background: var(--bg-2); color: var(--text-dim); border: 1px solid var(--border); }
+    .btn-g:hover { background: var(--bg-3); color: var(--text); }
+    .btn-danger { background: rgba(252,129,129,.12); color: var(--red); border: 1px solid rgba(252,129,129,.2); }
+    .btn-sm { padding: 5px 11px; font-size: 12px; }
     .btn-full { width: 100%; }
+    .btn-green { background: rgba(72,187,120,.15); color: var(--green); border: 1px solid rgba(72,187,120,.2); }
 
-    .sidebar-footer {
-      padding: 14px 16px;
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-      display: flex; flex-direction: column; gap: 8px;
-    }
-
-    /* Run controls */
-    .run-grid { display: flex; flex-direction: column; gap: 14px; }
-    .input-row { display: flex; gap: 10px; }
-    .input-row .field { flex: 1; margin-bottom: 0; }
+    /* Run panel */
+    .run-grid { display: flex; flex-direction: column; gap: 12px; }
+    .run-row { display: flex; gap: 10px; }
+    .run-row .f { flex: 1; margin: 0; }
     .run-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .toggle-group { display: flex; gap: 12px; }
-    .toggle-label {
-      display: flex; align-items: center; gap: 7px;
-      font-size: 12px; color: var(--text-dim); cursor: pointer;
-    }
-    .toggle-label input[type=checkbox] {
-      width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer;
-    }
+    .check-group { display: flex; gap: 14px; }
+    .check-lbl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
+    .check-lbl input { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; }
 
-    /* Log console */
-    .console {
-      background: #0a0c10;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      overflow: hidden;
-    }
-    .console-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 16px;
-      border-bottom: 1px solid var(--border);
-      background: var(--bg-1);
-    }
-    .console-title {
-      font-size: 11px; font-weight: 600; color: var(--text-dim);
-      text-transform: uppercase; letter-spacing: .07em;
-      display: flex; align-items: center; gap: 7px;
-    }
-    .console-dots { display: flex; gap: 5px; }
-    .console-dots span {
-      width: 10px; height: 10px; border-radius: 50%;
-    }
-    .dot-r { background: #ff5f57; }
-    .dot-y { background: #febc2e; }
-    .dot-g { background: #28c840; }
-    .console-body {
-      height: 320px;
-      overflow-y: auto;
-      padding: 14px 16px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      line-height: 1.7;
-    }
-    .console-body::-webkit-scrollbar { width: 4px; }
-    .console-body::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
-    .log-line { color: #a0aec0; }
-    .log-line.bug    { color: var(--red); }
-    .log-line.fix    { color: var(--yellow); }
-    .log-line.ok     { color: var(--green); }
-    .log-line.info   { color: var(--accent); }
-    .log-empty { color: var(--text-muted); font-style: italic; }
+    /* Console */
+    .console { background: #090b10; border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
+    .con-head { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; border-bottom: 1px solid var(--border); background: var(--bg-1); }
+    .con-dots { display: flex; gap: 5px; }
+    .con-dots span { width: 10px; height: 10px; border-radius: 50%; }
+    .cd-r{background:#ff5f57}.cd-y{background:#febc2e}.cd-g{background:#28c840}
+    .con-title { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .07em; }
+    .con-body { height: 280px; overflow-y: auto; padding: 12px 14px; font-family: 'JetBrains Mono',monospace; font-size: 12px; line-height: 1.75; }
+    .con-body::-webkit-scrollbar { width: 3px; }
+    .con-body::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
+    .ll { color: #7a8a9a; }
+    .ll.bug{color:var(--red)}.ll.fix{color:var(--yellow)}.ll.ok{color:var(--green)}.ll.info{color:var(--accent)}.ll.muted{color:var(--text-muted);font-style:italic}
 
-    /* Result cards */
-    .result-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 16px; }
-    .result-card {
-      background: var(--bg-2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-    }
-    .result-card .rc-label { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; }
-    .result-card .rc-value { font-size: 20px; font-weight: 700; }
-    .rc-green { color: var(--green); }
-    .rc-red   { color: var(--red); }
-    .rc-dim   { color: var(--text-dim); }
+    /* Result strip */
+    .res-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+    .res-card { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; }
+    .rc-lbl { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 5px; }
+    .rc-val { font-size: 18px; font-weight: 700; }
+    .c-green{color:var(--green)}.c-red{color:var(--red)}.c-dim{color:var(--text-dim)}
 
-    .pr-link {
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 14px;
-      background: var(--bg-2);
-      border: 1px solid var(--border-hi);
-      border-radius: var(--radius);
-      margin-top: 12px;
-      font-size: 13px;
-      color: var(--accent);
-      text-decoration: none;
-      word-break: break-all;
-    }
-    .pr-link:hover { background: var(--accent-glow); }
+    .pr-link { display: flex; align-items: center; gap: 8px; padding: 9px 13px; background: var(--bg-2); border: 1px solid var(--border-hi); border-radius: var(--r); margin-top: 10px; font-size: 12px; color: var(--accent); text-decoration: none; word-break: break-all; }
+    .pr-link:hover { background: var(--accent-g); }
 
-    .severity-badge {
-      display: inline-block;
-      padding: 2px 9px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .sev-critical { background: rgba(252,129,129,.2); color: var(--red); }
-    .sev-high     { background: rgba(246,173,85,.2);  color: #f6ad55; }
-    .sev-medium   { background: rgba(246,224,94,.2);  color: var(--yellow); }
-    .sev-low      { background: rgba(99,179,237,.15); color: var(--accent); }
-    .sev-none     { background: rgba(72,187,120,.15); color: var(--green); }
+    /* Severity badges */
+    .sev { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+    .sev-critical{background:rgba(252,129,129,.2);color:var(--red)}
+    .sev-high{background:rgba(246,173,85,.2);color:var(--orange)}
+    .sev-medium{background:rgba(246,224,94,.2);color:var(--yellow)}
+    .sev-low{background:rgba(99,179,237,.15);color:var(--accent)}
+    .sev-none{background:rgba(72,187,120,.15);color:var(--green)}
 
-    /* Save feedback */
-    .save-msg {
-      font-size: 11px;
-      color: var(--green);
-      text-align: center;
-      opacity: 0;
-      transition: opacity .3s;
-      height: 16px;
-    }
-    .save-msg.show { opacity: 1; }
+    /* ── Automate tab ─────────────────────────────────── */
+    .mode-tabs { display: flex; gap: 3px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r); padding: 3px; margin-bottom: 16px; }
+    .mode-btn { flex: 1; padding: 7px; border-radius: 7px; border: none; background: transparent; color: var(--text-dim); font: 500 12px 'Inter',sans-serif; cursor: pointer; transition: var(--tr); text-align: center; }
+    .mode-btn.on { background: var(--accent); color: #fff; box-shadow: 0 1px 8px rgba(99,179,237,.3); }
 
-    /* Responsive */
-    @media (max-width: 900px) {
+    .sched-info { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: rgba(183,148,244,.08); border: 1px solid rgba(183,148,244,.2); border-radius: var(--r); font-size: 12px; color: var(--purple); margin-bottom: 14px; }
+
+    .interval-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .preset-btn { padding: 4px 11px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text-dim); font-size: 11px; font-weight: 500; cursor: pointer; transition: var(--tr); }
+    .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .preset-btn.on { background: var(--accent-g); border-color: var(--accent); color: var(--accent); }
+
+    /* ── Queue tab ──────────────────────────────────── */
+    .queue-list { display: flex; flex-direction: column; gap: 8px; }
+    .q-item { display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r); }
+    .q-num { width: 22px; height: 22px; border-radius: 50%; background: var(--bg-3); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: var(--text-dim); flex-shrink: 0; margin-top: 1px; }
+    .q-info { flex: 1; min-width: 0; }
+    .q-url { font-size: 13px; font-weight: 500; word-break: break-all; margin-bottom: 2px; }
+    .q-meta { font-size: 11px; color: var(--text-muted); }
+    .q-del { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 14px; padding: 2px 5px; border-radius: 5px; transition: var(--tr); flex-shrink: 0; }
+    .q-del:hover { color: var(--red); background: rgba(252,129,129,.1); }
+    .q-empty { text-align: center; padding: 32px; color: var(--text-muted); font-size: 13px; }
+
+    /* ── History tab ──────────────────────────────── */
+    .hist-list { display: flex; flex-direction: column; gap: 8px; }
+    .h-item { padding: 12px 14px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r); display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; }
+    .h-icon { font-size: 18px; }
+    .h-body { min-width: 0; }
+    .h-url { font-size: 12px; font-weight: 600; word-break: break-all; margin-bottom: 2px; }
+    .h-sum { font-size: 11px; color: var(--text-dim); }
+    .h-meta { text-align: right; white-space: nowrap; }
+    .h-ts { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; }
+    .h-pr { font-size: 11px; color: var(--accent); text-decoration: none; }
+    .h-pr:hover { text-decoration: underline; }
+    .h-empty { text-align: center; padding: 32px; color: var(--text-muted); font-size: 13px; }
+
+    /* Utility */
+    .divider { height: 1px; background: var(--border); margin: 14px 0; }
+    .row { display: flex; gap: 10px; align-items: flex-start; }
+    .row .f { flex: 1; margin: 0; }
+    .gap-top { margin-top: 10px; }
+    .section-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px; }
+    .notif-bar { padding: 8px 13px; border-radius: var(--r); font-size: 12px; display: flex; align-items: center; gap: 7px; }
+    .notif-bar.info   { background: var(--accent-g); color: var(--accent); border: 1px solid var(--border-hi); }
+    .notif-bar.warn   { background: rgba(246,173,85,.1); color: var(--orange); border: 1px solid rgba(246,173,85,.2); }
+    .notif-bar.hidden { display: none; }
+
+    @media (max-width:860px) {
       .app { flex-direction: column; height: auto; }
-      .sidebar { width: 100%; min-width: unset; border-right: none; border-bottom: 1px solid var(--border); }
-      .result-grid { grid-template-columns: 1fr 1fr; }
+      .sidebar { width: 100%; min-width: unset; border-right: none; border-bottom: 1px solid var(--border); max-height: 55vh; }
+      .main { min-height: 60vh; }
+      .res-grid { grid-template-columns: 1fr 1fr; }
     }
-    @media (max-width: 560px) {
-      .result-grid { grid-template-columns: 1fr; }
-      .topbar { padding: 12px 16px; }
-      .main-content { padding: 16px; }
+    @media (max-width:520px) {
+      .res-grid { grid-template-columns: 1fr; }
+      .topbar { padding: 0 14px; }
+      .panel { padding: 14px; }
+      .tabs .tab { padding: 6px 10px; font-size: 12px; }
     }
   </style>
 </head>
 <body>
-
 <div class="app">
 
-  <!-- ── Sidebar: Settings ────────────────────────────────── -->
+  <!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
   <aside class="sidebar">
-    <div class="sidebar-header">
+    <div class="sidebar-head">
       <div class="logo">
         <div class="logo-icon">🤖</div>
-        <h1>Bug Engine</h1>
+        <div>
+          <div class="logo-name">Bug Engine</div>
+          <div class="logo-sub">Autonomous UI Repair Pipeline</div>
+        </div>
       </div>
-      <div class="logo-sub">Autonomous UI Repair Pipeline</div>
     </div>
 
-    <div class="sidebar-scroll" id="settingsForm">
+    <div class="sidebar-scroll">
 
       <!-- LLM Provider -->
-      <div class="section">
-        <button class="section-header open" onclick="toggleSection(this)" id="sec-llm">
-          <span>⚡ LLM Provider</span><span class="chevron">▼</span>
+      <div class="acc">
+        <button class="acc-hd open" onclick="accToggle(this)">
+          <span>⚡ LLM Provider</span><span class="ch">▼</span>
         </button>
-        <div class="section-body open">
-          <div class="provider-toggle">
-            <button class="provider-btn active" id="btn-openrouter" onclick="setProvider('openrouter')">OpenRouter</button>
-            <button class="provider-btn" id="btn-bedrock" onclick="setProvider('bedrock')">AWS Bedrock</button>
+        <div class="acc-bd open">
+          <div class="prov-wrap">
+            <button class="prov-btn on" id="pbtn-or" onclick="setProvider('openrouter')">OpenRouter</button>
+            <button class="prov-btn"    id="pbtn-bd" onclick="setProvider('bedrock')">AWS Bedrock</button>
           </div>
-
-          <!-- OpenRouter fields -->
-          <div id="openrouter-fields">
-            <div class="field">
-              <label>API Key</label>
-              <input type="password" id="OPENROUTER_API_KEY" placeholder="sk-or-v1-..." autocomplete="off" />
-              <div class="field-hint">From openrouter.ai/keys</div>
+          <!-- OpenRouter -->
+          <div id="or-fields">
+            <div class="f"><label>API Key</label>
+              <input type="password" id="OPENROUTER_API_KEY" placeholder="sk-or-v1-…" autocomplete="off" />
+              <div class="f-hint">openrouter.ai/keys</div>
             </div>
-            <div class="field">
-              <label>Model</label>
+            <div class="f"><label>Model</label>
               <select id="MODEL_NAME">
                 <option value="x-ai/grok-4">xAI Grok-4</option>
                 <option value="x-ai/grok-3">xAI Grok-3</option>
@@ -437,19 +307,15 @@
               </select>
             </div>
           </div>
-
-          <!-- Bedrock fields -->
-          <div id="bedrock-fields" style="display:none">
-            <div class="field">
-              <label>AWS Access Key ID</label>
-              <input type="password" id="AWS_ACCESS_KEY_ID" placeholder="AKIA..." autocomplete="off" />
+          <!-- Bedrock -->
+          <div id="bd-fields" style="display:none">
+            <div class="f"><label>AWS Access Key ID</label>
+              <input type="password" id="AWS_ACCESS_KEY_ID" placeholder="AKIA…" autocomplete="off" />
             </div>
-            <div class="field">
-              <label>AWS Secret Access Key</label>
-              <input type="password" id="AWS_SECRET_ACCESS_KEY" placeholder="secret..." autocomplete="off" />
+            <div class="f"><label>AWS Secret Access Key</label>
+              <input type="password" id="AWS_SECRET_ACCESS_KEY" placeholder="secret…" autocomplete="off" />
             </div>
-            <div class="field">
-              <label>AWS Region</label>
+            <div class="f"><label>Region</label>
               <select id="AWS_REGION">
                 <option value="us-east-1">us-east-1 (N. Virginia)</option>
                 <option value="us-west-2">us-west-2 (Oregon)</option>
@@ -457,8 +323,7 @@
                 <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
               </select>
             </div>
-            <div class="field">
-              <label>Bedrock Model ID</label>
+            <div class="f"><label>Bedrock Model</label>
               <select id="BEDROCK_MODEL_ID">
                 <option value="anthropic.claude-3-5-sonnet-20241022-v2:0">Claude 3.5 Sonnet v2</option>
                 <option value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku</option>
@@ -467,78 +332,66 @@
                 <option value="amazon.nova-lite-v1:0">Amazon Nova Lite</option>
                 <option value="mistral.mistral-large-2402-v1:0">Mistral Large</option>
               </select>
-              <div class="field-hint">Note: Grok is available via xAI/OpenRouter, not Bedrock.</div>
+              <div class="f-hint">⚠️ Grok is not on Bedrock — use OpenRouter for Grok.</div>
             </div>
           </div>
-
-          <!-- Shared tuning -->
-          <div class="field">
-            <label>Temperature</label>
+          <div class="f"><label>Temperature</label>
             <input type="number" id="LLM_TEMPERATURE" value="0.0" min="0" max="2" step="0.1" />
           </div>
-          <div class="field">
-            <label>Max Tokens</label>
+          <div class="f"><label>Max Tokens</label>
             <input type="number" id="LLM_MAX_TOKENS" value="4096" min="256" step="256" />
           </div>
         </div>
       </div>
 
       <!-- GitHub -->
-      <div class="section">
-        <button class="section-header" onclick="toggleSection(this)">
-          <span>🐙 GitHub</span><span class="chevron">▼</span>
+      <div class="acc">
+        <button class="acc-hd" onclick="accToggle(this)">
+          <span>🐙 GitHub</span><span class="ch">▼</span>
         </button>
-        <div class="section-body">
-          <div class="field">
-            <label>Personal Access Token</label>
-            <input type="password" id="GITHUB_TOKEN" placeholder="github_pat_..." autocomplete="off" />
-            <div class="field-hint">Needs: Contents (rw) + Pull Requests (rw)</div>
+        <div class="acc-bd">
+          <div class="f"><label>Personal Access Token</label>
+            <input type="password" id="GITHUB_TOKEN" placeholder="github_pat_…" autocomplete="off" />
+            <div class="f-hint">Needs: Contents (rw) + Pull Requests (rw)</div>
           </div>
-          <div class="field">
-            <label>Repository (owner/repo)</label>
+          <div class="f"><label>Repository (owner/repo)</label>
             <input type="text" id="REPO_NAME" placeholder="KashinathTilagul/autonomous-engine" />
           </div>
-          <div class="field">
-            <label>Base Branch</label>
+          <div class="f"><label>Base Branch</label>
             <input type="text" id="GITHUB_BASE_BRANCH" value="main" />
           </div>
         </div>
       </div>
 
       <!-- OpenHands -->
-      <div class="section">
-        <button class="section-header" onclick="toggleSection(this)">
-          <span>🐳 OpenHands</span><span class="chevron">▼</span>
+      <div class="acc">
+        <button class="acc-hd" onclick="accToggle(this)">
+          <span>🐳 OpenHands</span><span class="ch">▼</span>
         </button>
-        <div class="section-body">
-          <div class="field">
-            <label>API URL</label>
+        <div class="acc-bd">
+          <div class="f"><label>API URL</label>
             <input type="text" id="OPENHANDS_API_URL" value="http://localhost:3000" />
-            <div class="field-hint">Docker container REST endpoint</div>
+            <div class="f-hint">Docker container REST endpoint</div>
           </div>
-          <div class="field">
-            <label>API Key (optional)</label>
+          <div class="f"><label>API Key (optional)</label>
             <input type="password" id="OPENHANDS_API_KEY" placeholder="leave blank if none" autocomplete="off" />
           </div>
-          <div class="field">
-            <label>Timeout (seconds)</label>
+          <div class="f"><label>Timeout (seconds)</label>
             <input type="number" id="OPENHANDS_TIMEOUT_SECONDS" value="600" min="60" step="60" />
           </div>
         </div>
       </div>
 
       <!-- Browser -->
-      <div class="section">
-        <button class="section-header" onclick="toggleSection(this)">
-          <span>🌐 Browser</span><span class="chevron">▼</span>
+      <div class="acc">
+        <button class="acc-hd" onclick="accToggle(this)">
+          <span>🌐 Browser / Misc</span><span class="ch">▼</span>
         </button>
-        <div class="section-body">
-          <div class="field">
-            <label>Max Browser Steps</label>
+        <div class="acc-bd">
+          <div class="f"><label>Max Browser Steps</label>
             <input type="number" id="BROWSER_MAX_STEPS" value="25" min="5" max="100" />
           </div>
-          <div class="field">
-            <label>Log Level</label>
+          <div class="f"><label>Log Level</label>
             <select id="LOG_LEVEL">
               <option value="INFO">INFO</option>
               <option value="DEBUG">DEBUG</option>
@@ -548,59 +401,49 @@
           </div>
         </div>
       </div>
-
     </div><!-- /sidebar-scroll -->
 
-    <div class="sidebar-footer">
-      <div class="save-msg" id="saveMsg">✓ Settings saved securely to .env</div>
-      <button class="btn btn-primary btn-full" onclick="saveSettings()" id="saveBtn">
-        💾 Save Settings
-      </button>
+    <div class="sidebar-foot">
+      <div class="save-note" id="saveNote">✓ Saved securely to .env</div>
+      <button class="btn btn-p btn-full" onclick="saveSettings()" id="saveBtn">💾 Save Settings</button>
     </div>
   </aside>
 
-  <!-- ── Main Panel ───────────────────────────────────────── -->
+  <!-- ═══════════════════════ MAIN ══════════════════════════ -->
   <main class="main">
     <div class="topbar">
-      <h2>Pipeline Control</h2>
-      <div class="status-badge" id="statusBadge">
-        <span class="status-dot"></span>
-        <span id="statusText">Idle</span>
+      <div class="tabs">
+        <button class="tab on"  id="tab-run"      onclick="switchTab('run')">▶ Run</button>
+        <button class="tab"     id="tab-automate" onclick="switchTab('automate')">⏰ Automate</button>
+        <button class="tab"     id="tab-queue"    onclick="switchTab('queue')">📋 Queue <span id="q-badge"></span></button>
+        <button class="tab"     id="tab-history"  onclick="switchTab('history')">🕘 History</button>
+      </div>
+      <div class="status" id="statusBadge">
+        <span class="dot"></span><span id="statusTxt">Idle</span>
       </div>
     </div>
 
-    <div class="main-content">
-
-      <!-- Run Controls -->
+    <!-- ─── RUN panel ─────────────────────────────────── -->
+    <div class="panel on" id="panel-run">
       <div class="card">
-        <div class="card-title"><span class="icon">🚀</span> New Run</div>
+        <div class="card-title">🚀 Run Pipeline</div>
         <div class="run-grid">
-          <div class="field" style="margin-bottom:0">
-            <label>Target URL</label>
-            <input type="url" id="targetUrl" placeholder="https://your-staging-site.com" />
+          <div class="f"><label>Target URL *</label>
+            <input type="url" id="r-url" placeholder="https://staging.example.com" />
           </div>
-          <div class="field" style="margin-bottom:0">
-            <label>Test Scenario</label>
-            <textarea id="scenario" placeholder="Navigate the site as a new user and report any visual or functional bugs..." rows="3"></textarea>
+          <div class="f"><label>Test Scenario</label>
+            <textarea id="r-scenario" rows="3" placeholder="Navigate the site as a new user and report any visual or functional bugs…"></textarea>
           </div>
-          <div class="field" style="margin-bottom:0">
-            <label>Local Repo Path</label>
-            <input type="text" id="repoPath" value="." placeholder="/absolute/path/to/repo" />
+          <div class="f"><label>Local Repo Path</label>
+            <input type="text" id="r-repo" value="." placeholder="/absolute/path/to/repo" />
           </div>
           <div class="run-actions">
-            <button class="btn btn-primary" id="runBtn" onclick="startRun()">
-              ▶ Run Pipeline
-            </button>
-            <button class="btn btn-ghost btn-sm" onclick="clearLog()">Clear Log</button>
-            <div class="toggle-group">
-              <label class="toggle-label">
-                <input type="checkbox" id="toggleVerify" checked />
-                Re-verify after fix
-              </label>
-              <label class="toggle-label">
-                <input type="checkbox" id="togglePR" />
-                Publish PR
-              </label>
+            <button class="btn btn-p" id="runBtn" onclick="startRun()">▶ Run Now</button>
+            <button class="btn btn-g btn-sm" onclick="addToQueue()">+ Add to Queue</button>
+            <button class="btn btn-g btn-sm" onclick="clearLog()">Clear</button>
+            <div class="check-group">
+              <label class="check-lbl"><input type="checkbox" id="r-verify" checked /> Re-verify</label>
+              <label class="check-lbl"><input type="checkbox" id="r-pr" /> Publish PR</label>
             </div>
           </div>
         </div>
@@ -608,299 +451,584 @@
 
       <!-- Console -->
       <div class="console">
-        <div class="console-header">
-          <div class="console-dots">
-            <span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span>
-          </div>
-          <div class="console-title">📋 Live Output</div>
-          <button class="btn btn-ghost btn-sm" onclick="copyLog()">Copy</button>
+        <div class="con-head">
+          <div class="con-dots"><span class="cd-r"></span><span class="cd-y"></span><span class="cd-g"></span></div>
+          <div class="con-title">📡 Live Output</div>
+          <button class="btn btn-g btn-sm" onclick="copyLog()">Copy</button>
         </div>
-        <div class="console-body" id="consoleBody">
-          <span class="log-empty">Output will appear here when a run starts…</span>
+        <div class="con-body" id="conBody">
+          <span class="ll muted">Output will appear here when a run starts…</span>
         </div>
       </div>
 
-      <!-- Results -->
-      <div id="resultsSection" style="display:none">
-        <div class="card" style="margin-top:16px;margin-bottom:0">
-          <div class="card-title"><span class="icon">📊</span> Last Run Results</div>
-          <div class="result-grid">
-            <div class="result-card">
-              <div class="rc-label">Bug Found</div>
-              <div class="rc-value" id="r-bug">—</div>
-            </div>
-            <div class="result-card">
-              <div class="rc-label">Severity</div>
-              <div class="rc-value" id="r-sev">—</div>
-            </div>
-            <div class="result-card">
-              <div class="rc-label">Fix Applied</div>
-              <div class="rc-value" id="r-fix">—</div>
-            </div>
+      <!-- Result -->
+      <div id="resSection" style="display:none">
+        <div class="card" style="margin-top:14px;margin-bottom:0">
+          <div class="card-title">📊 Last Result</div>
+          <div class="res-grid">
+            <div class="res-card"><div class="rc-lbl">Bug Found</div><div class="rc-val" id="rv-bug">—</div></div>
+            <div class="res-card"><div class="rc-lbl">Severity</div> <div class="rc-val" id="rv-sev">—</div></div>
+            <div class="res-card"><div class="rc-lbl">Fixed</div>    <div class="rc-val" id="rv-fix">—</div></div>
           </div>
-          <div id="r-summary" style="margin-top:12px;font-size:13px;color:var(--text-dim);display:none"></div>
-          <a id="r-pr" class="pr-link" style="display:none" target="_blank">
-            🔗 View Pull Request
-          </a>
+          <div id="rv-sum" style="margin-top:10px;font-size:12px;color:var(--text-dim);display:none"></div>
+          <a id="rv-pr" class="pr-link" style="display:none" target="_blank">🔗 View Pull Request</a>
         </div>
       </div>
+    </div>
 
-    </div><!-- /main-content -->
+    <!-- ─── AUTOMATE panel ────────────────────────────── -->
+    <div class="panel" id="panel-automate">
+      <div class="card">
+        <div class="card-title">⏰ Automated Scheduling</div>
+
+        <div id="sched-active" class="sched-info hidden">
+          <span>⏰</span><span id="sched-next-txt">Next run: calculating…</span>
+          <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="disableSchedule()">Stop</button>
+        </div>
+
+        <div class="section-label">Schedule Mode</div>
+        <div class="mode-tabs">
+          <button class="mode-btn on" id="smode-interval" onclick="setSMode('interval')">Every N Minutes</button>
+          <button class="mode-btn"    id="smode-cron"     onclick="setSMode('cron')">Cron Expression</button>
+        </div>
+
+        <!-- Interval mode -->
+        <div id="interval-mode">
+          <div class="section-label">Quick Presets</div>
+          <div class="interval-presets">
+            <button class="preset-btn" onclick="setInterval(15)">15 min</button>
+            <button class="preset-btn" onclick="setInterval(30)">30 min</button>
+            <button class="preset-btn" onclick="setInterval(60)">1 hour</button>
+            <button class="preset-btn" onclick="setInterval(360)">6 hours</button>
+            <button class="preset-btn" onclick="setInterval(720)">12 hours</button>
+            <button class="preset-btn" onclick="setInterval(1440)">Daily</button>
+          </div>
+          <div class="f"><label>Custom Interval (minutes)</label>
+            <input type="number" id="s-interval" value="60" min="5" step="5" />
+          </div>
+        </div>
+
+        <!-- Cron mode -->
+        <div id="cron-mode" style="display:none">
+          <div class="f"><label>Cron Expression (5 fields)</label>
+            <input type="text" id="s-cron" placeholder="0 9 * * 1-5" />
+            <div class="f-hint">Examples: <code>0 9 * * *</code> (daily 9am) · <code>0 */4 * * *</code> (every 4h) · <code>30 8 * * 1-5</code> (weekdays 8:30am)</div>
+          </div>
+          <div class="interval-presets">
+            <button class="preset-btn" onclick="setCron('*/30 * * * *')">Every 30min</button>
+            <button class="preset-btn" onclick="setCron('0 * * * *')">Hourly</button>
+            <button class="preset-btn" onclick="setCron('0 9 * * *')">Daily 9am</button>
+            <button class="preset-btn" onclick="setCron('0 9 * * 1-5')">Weekdays 9am</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="section-label">Target for Scheduled Runs</div>
+        <div class="f"><label>URL *</label>
+          <input type="url" id="s-url" placeholder="https://your-site.com" />
+        </div>
+        <div class="f"><label>Scenario</label>
+          <textarea id="s-scenario" rows="2" placeholder="Navigate the site as a new user and report any visual or functional bugs…"></textarea>
+        </div>
+        <div class="row gap-top">
+          <div class="f"><label>Repo Path</label>
+            <input type="text" id="s-repo" value="." />
+          </div>
+        </div>
+        <div class="check-group" style="margin-top:10px;margin-bottom:14px">
+          <label class="check-lbl"><input type="checkbox" id="s-verify" checked /> Re-verify</label>
+          <label class="check-lbl"><input type="checkbox" id="s-pr" /> Auto-publish PR</label>
+        </div>
+
+        <button class="btn btn-p" onclick="saveSchedule()">⏰ Activate Schedule</button>
+        <button class="btn btn-g btn-sm" style="margin-left:8px" onclick="runScheduledNow()">▶ Run Now Once</button>
+      </div>
+
+      <!-- Browser notifications -->
+      <div class="card">
+        <div class="card-title">🔔 Browser Notifications</div>
+        <p style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Get a desktop notification when a scheduled run completes or finds a bug.</p>
+        <button class="btn btn-g btn-sm" onclick="requestNotifPerm()" id="notifBtn">Enable Notifications</button>
+        <span id="notifStatus" style="margin-left:10px;font-size:11px;color:var(--text-dim)"></span>
+      </div>
+    </div>
+
+    <!-- ─── QUEUE panel ───────────────────────────────── -->
+    <div class="panel" id="panel-queue">
+      <div class="card">
+        <div class="card-title" style="justify-content:space-between">
+          <span>📋 URL Queue</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-green btn-sm" id="runQueueBtn" onclick="runQueue()">▶ Run All</button>
+            <button class="btn btn-danger btn-sm" onclick="clearQueue()">Clear</button>
+          </div>
+        </div>
+        <div class="queue-list" id="queueList">
+          <div class="q-empty">No URLs in queue. Add from the Run tab or below.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">➕ Add to Queue</div>
+        <div class="f"><label>URL</label>
+          <input type="url" id="qa-url" placeholder="https://example.com/page" />
+        </div>
+        <div class="f"><label>Scenario (optional)</label>
+          <input type="text" id="qa-scenario" placeholder="Click every button and look for errors" />
+        </div>
+        <div class="check-group" style="margin-bottom:12px">
+          <label class="check-lbl"><input type="checkbox" id="qa-verify" checked /> Re-verify</label>
+          <label class="check-lbl"><input type="checkbox" id="qa-pr" /> Publish PR</label>
+        </div>
+        <button class="btn btn-p btn-sm" onclick="addItemToQueue()">Add to Queue</button>
+      </div>
+    </div>
+
+    <!-- ─── HISTORY panel ─────────────────────────────── -->
+    <div class="panel" id="panel-history">
+      <div class="card">
+        <div class="card-title" style="justify-content:space-between">
+          <span>🕘 Run History</span>
+          <button class="btn btn-danger btn-sm" onclick="clearHistory()">Clear All</button>
+        </div>
+        <div class="hist-list" id="histList">
+          <div class="h-empty">No runs yet. Start a run or schedule one!</div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div><!-- /app -->
 
 <script>
-  /* ── State ─────────────────────────────────────────────── */
-  let provider = 'openrouter';
-  let polling  = null;
-  let sseConn  = null;
+/* ════════════════════════════════════════════════
+   State
+   ════════════════════════════════════════════════ */
+let provider = 'openrouter';
+let schedMode = 'interval';
+let sseConn = null;
+let notifAllowed = false;
+let pollTimer = null;
 
-  /* ── Init ──────────────────────────────────────────────── */
-  document.addEventListener('DOMContentLoaded', loadSettings);
+/* ════════════════════════════════════════════════
+   Boot
+   ════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  loadSettings();
+  loadQueue();
+  loadHistory();
+  loadSchedule();
+  checkNotifPerm();
+  // Poll status every 5s to keep badge fresh
+  setInterval(refreshStatus, 5000);
+});
 
-  async function loadSettings() {
-    try {
-      const res  = await fetch('/api/settings');
-      const data = await res.json();
+/* ════════════════════════════════════════════════
+   Tab switching
+   ════════════════════════════════════════════════ */
+function switchTab(name) {
+  ['run','automate','queue','history'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('on', t === name);
+    document.getElementById(`panel-${t}`).classList.toggle('on', t === name);
+  });
+  if (name === 'history') loadHistory();
+  if (name === 'queue')   loadQueue();
+  if (name === 'automate') loadSchedule();
+}
 
-      const fields = [
-        'OPENROUTER_API_KEY','MODEL_NAME','LLM_TEMPERATURE','LLM_MAX_TOKENS',
-        'OPENHANDS_API_URL','OPENHANDS_API_KEY','OPENHANDS_TIMEOUT_SECONDS',
-        'GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH',
-        'BROWSER_MAX_STEPS','LOG_LEVEL',
-        'AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_REGION','BEDROCK_MODEL_ID'
-      ];
-      fields.forEach(k => {
-        const el = document.getElementById(k);
-        if (el && data[k]) el.value = data[k];
-      });
+/* ════════════════════════════════════════════════
+   Sidebar accordion
+   ════════════════════════════════════════════════ */
+function accToggle(btn) {
+  btn.classList.toggle('open');
+  btn.nextElementSibling.classList.toggle('open');
+}
 
-      // Set provider
-      const p = data.LLM_PROVIDER || 'openrouter';
-      setProvider(p);
-    } catch(e) {
-      console.warn('Could not load settings:', e);
-    }
-  }
+/* ════════════════════════════════════════════════
+   Provider
+   ════════════════════════════════════════════════ */
+function setProvider(p) {
+  provider = p;
+  document.getElementById('pbtn-or').classList.toggle('on', p === 'openrouter');
+  document.getElementById('pbtn-bd').classList.toggle('on', p === 'bedrock');
+  document.getElementById('or-fields').style.display = p === 'openrouter' ? '' : 'none';
+  document.getElementById('bd-fields').style.display  = p === 'bedrock'    ? '' : 'none';
+}
 
-  /* ── Provider toggle ───────────────────────────────────── */
-  function setProvider(p) {
-    provider = p;
-    document.getElementById('btn-openrouter').classList.toggle('active', p === 'openrouter');
-    document.getElementById('btn-bedrock').classList.toggle('active', p === 'bedrock');
-    document.getElementById('openrouter-fields').style.display = p === 'openrouter' ? '' : 'none';
-    document.getElementById('bedrock-fields').style.display   = p === 'bedrock'    ? '' : 'none';
-  }
-
-  /* ── Section accordion ─────────────────────────────────── */
-  function toggleSection(btn) {
-    btn.classList.toggle('open');
-    const body = btn.nextElementSibling;
-    body.classList.toggle('open');
-  }
-
-  /* ── Save settings ─────────────────────────────────────── */
-  async function saveSettings() {
-    const btn = document.getElementById('saveBtn');
-    btn.disabled = true;
-    btn.textContent = 'Saving…';
-
-    const payload = { LLM_PROVIDER: provider };
-    const fields = [
-      'OPENROUTER_API_KEY','MODEL_NAME','OPENROUTER_BASE_URL',
-      'LLM_TEMPERATURE','LLM_MAX_TOKENS',
-      'AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_REGION','BEDROCK_MODEL_ID',
+/* ════════════════════════════════════════════════
+   Settings
+   ════════════════════════════════════════════════ */
+async function loadSettings() {
+  try {
+    const d = await fetch('/api/settings').then(r => r.json());
+    const flds = ['OPENROUTER_API_KEY','MODEL_NAME','LLM_TEMPERATURE','LLM_MAX_TOKENS',
       'OPENHANDS_API_URL','OPENHANDS_API_KEY','OPENHANDS_TIMEOUT_SECONDS',
-      'GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH',
-      'BROWSER_MAX_STEPS','LOG_LEVEL'
-    ];
-    fields.forEach(k => {
-      const el = document.getElementById(k);
-      if (el) payload[k] = el.value;
-    });
+      'GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH','BROWSER_MAX_STEPS','LOG_LEVEL',
+      'AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_REGION','BEDROCK_MODEL_ID'];
+    flds.forEach(k => { const el = document.getElementById(k); if (el && d[k]) el.value = d[k]; });
+    setProvider(d.LLM_PROVIDER || 'openrouter');
+  } catch(e) { console.warn('loadSettings:', e); }
+}
 
+async function saveSettings() {
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const payload = { LLM_PROVIDER: provider };
+  ['OPENROUTER_API_KEY','MODEL_NAME','OPENROUTER_BASE_URL','LLM_TEMPERATURE','LLM_MAX_TOKENS',
+   'AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_REGION','BEDROCK_MODEL_ID',
+   'OPENHANDS_API_URL','OPENHANDS_API_KEY','OPENHANDS_TIMEOUT_SECONDS',
+   'GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH','BROWSER_MAX_STEPS','LOG_LEVEL']
+   .forEach(k => { const el = document.getElementById(k); if (el) payload[k] = el.value; });
+  try {
+    const r = await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    if (!r.ok) throw new Error(await r.text());
+    const n = document.getElementById('saveNote');
+    n.classList.add('show'); setTimeout(() => n.classList.remove('show'), 3000);
+  } catch(e) { alert('Save failed: ' + e.message); }
+  btn.disabled = false; btn.textContent = '💾 Save Settings';
+}
+
+/* ════════════════════════════════════════════════
+   Run
+   ════════════════════════════════════════════════ */
+async function startRun() {
+  const url = document.getElementById('r-url').value.trim();
+  if (!url) { alert('Enter a target URL.'); return; }
+  const payload = {
+    url,
+    scenario:   document.getElementById('r-scenario').value.trim(),
+    repo_path:  document.getElementById('r-repo').value.trim() || '.',
+    verify:     document.getElementById('r-verify').checked,
+    publish_pr: document.getElementById('r-pr').checked,
+  };
+  clearLog();
+  setStatus('running','Running…');
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('resSection').style.display = 'none';
+  try {
+    const r = await fetch('/api/run', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    if (!r.ok) throw new Error((await r.json()).detail);
+  } catch(e) { appendLog('❌ ' + e.message, 'bug'); setStatus('error','Error'); document.getElementById('runBtn').disabled = false; return; }
+  openSSE();
+}
+
+function openSSE() {
+  if (sseConn) sseConn.close();
+  sseConn = new EventSource('/api/run/stream');
+  sseConn.onmessage = e => {
+    const d = JSON.parse(e.data);
+    if (d.line) appendLog(d.line);
+    if (d.done) { sseConn.close(); onDone(d.result); }
+  };
+  sseConn.onerror = () => { sseConn.close(); startPolling(); };
+}
+
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  let lastLen = 0;
+  pollTimer = setInterval(async () => {
     try {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) throw new Error(await res.text());
+      const d = await fetch('/api/run/status').then(r => r.json());
+      d.log.slice(lastLen).forEach(l => appendLog(l));
+      lastLen = d.log.length;
+      if (d.status !== 'running') { clearInterval(pollTimer); onDone(d.result); }
+    } catch(_) {}
+  }, 800);
+}
 
-      const msg = document.getElementById('saveMsg');
-      msg.classList.add('show');
-      setTimeout(() => msg.classList.remove('show'), 3000);
-    } catch(e) {
-      alert('Save failed: ' + e.message);
+function onDone(result) {
+  document.getElementById('runBtn').disabled = false;
+  if (!result) { setStatus('error','Error'); return; }
+  setStatus(result.error && !result.bug_found ? 'error' : 'done', 'Done');
+  showResult(result);
+  loadHistory();
+  // Browser notification
+  if (notifAllowed) {
+    const msg = result.bug_found
+      ? `🐛 Bug found (${result.severity}) — ${result.summary || ''}`
+      : '✅ No bugs detected.';
+    new Notification('Bug Engine', { body: msg, icon: '' });
+  }
+}
+
+/* ════════════════════════════════════════════════
+   Result display
+   ════════════════════════════════════════════════ */
+function showResult(r) {
+  document.getElementById('resSection').style.display = '';
+  const bugEl = document.getElementById('rv-bug');
+  bugEl.textContent = r.bug_found ? '🐛 Yes' : '✅ No';
+  bugEl.className   = 'rc-val ' + (r.bug_found ? 'c-red' : 'c-green');
+  const sev = (r.severity || 'none').toLowerCase();
+  document.getElementById('rv-sev').innerHTML = `<span class="sev sev-${sev}">${sev}</span>`;
+  const fixEl = document.getElementById('rv-fix');
+  fixEl.textContent = r.fixed ? '✅ Yes' : (r.bug_found ? '❌ No' : '—');
+  fixEl.className   = 'rc-val ' + (r.fixed ? 'c-green' : r.bug_found ? 'c-red' : 'c-dim');
+  const sumEl = document.getElementById('rv-sum');
+  if (r.summary) { sumEl.textContent = r.summary; sumEl.style.display = ''; }
+  const prEl = document.getElementById('rv-pr');
+  if (r.pr_url) { prEl.href = r.pr_url; prEl.textContent = '🔗 ' + r.pr_url; prEl.style.display = 'flex'; }
+}
+
+/* ════════════════════════════════════════════════
+   Console
+   ════════════════════════════════════════════════ */
+function appendLog(line, cls) {
+  const body = document.getElementById('conBody');
+  const emp = body.querySelector('.muted'); if (emp) emp.remove();
+  if (!cls) {
+    if (/🐛|❌|💥/.test(line)) cls = 'bug';
+    else if (/🔧|📬|⚠/.test(line))  cls = 'fix';
+    else if (/✅|🏁|🎉/.test(line))  cls = 'ok';
+    else if (/🚀|🔍|ℹ|⏰/.test(line))  cls = 'info';
+  }
+  const d = document.createElement('div');
+  d.className = 'll' + (cls ? ' ' + cls : '');
+  d.textContent = line;
+  body.appendChild(d);
+  body.scrollTop = body.scrollHeight;
+}
+function clearLog() {
+  document.getElementById('conBody').innerHTML = '<span class="ll muted">Output will appear here when a run starts…</span>';
+}
+function copyLog() {
+  const lines = [...document.querySelectorAll('.ll:not(.muted)')].map(e => e.textContent).join('\n');
+  navigator.clipboard.writeText(lines).then(() => { const b=event.target; b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',1500); });
+}
+
+/* ════════════════════════════════════════════════
+   Status badge
+   ════════════════════════════════════════════════ */
+function setStatus(cls, txt) {
+  const b = document.getElementById('statusBadge');
+  b.className = 'status ' + cls;
+  document.getElementById('statusTxt').textContent = txt;
+}
+async function refreshStatus() {
+  try {
+    const d = await fetch('/api/run/status').then(r => r.json());
+    if (d.status === 'running') setStatus('running','Running…');
+    else if (d.status === 'done') setStatus('done','Done');
+    else if (d.status === 'error') setStatus('error','Error');
+    else setStatus('', 'Idle');
+  } catch(_) {}
+}
+
+/* ════════════════════════════════════════════════
+   Schedule
+   ════════════════════════════════════════════════ */
+function setSMode(m) {
+  schedMode = m;
+  document.getElementById('smode-interval').classList.toggle('on', m === 'interval');
+  document.getElementById('smode-cron').classList.toggle('on',     m === 'cron');
+  document.getElementById('interval-mode').style.display = m === 'interval' ? '' : 'none';
+  document.getElementById('cron-mode').style.display      = m === 'cron'    ? '' : 'none';
+}
+function setInterval(mins) {
+  document.getElementById('s-interval').value = mins;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('on'));
+  event.target.classList.add('on');
+}
+function setCron(expr) {
+  document.getElementById('s-cron').value = expr;
+  document.querySelectorAll('#cron-mode .preset-btn').forEach(b => b.classList.remove('on'));
+  event.target.classList.add('on');
+}
+async function saveSchedule() {
+  const url = document.getElementById('s-url').value.trim();
+  if (!url) { alert('Enter a target URL for scheduling.'); return; }
+  const payload = {
+    mode: schedMode,
+    interval_minutes: schedMode === 'interval' ? +document.getElementById('s-interval').value : null,
+    cron_expression:  schedMode === 'cron'     ? document.getElementById('s-cron').value.trim() : null,
+    url,
+    scenario:   document.getElementById('s-scenario').value.trim(),
+    repo_path:  document.getElementById('s-repo').value.trim() || '.',
+    verify:     document.getElementById('s-verify').checked,
+    publish_pr: document.getElementById('s-pr').checked,
+  };
+  try {
+    const r = await fetch('/api/schedule', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    updateSchedBanner(d);
+    setStatus('scheduled', 'Scheduled');
+    alert('✅ Schedule activated!\nNext run: ' + (d.next_run ? new Date(d.next_run).toLocaleString() : 'pending'));
+  } catch(e) { alert('Error: ' + e.message); }
+}
+async function disableSchedule() {
+  await fetch('/api/schedule', { method:'DELETE' });
+  document.getElementById('sched-active').classList.add('hidden');
+  setStatus('', 'Idle');
+}
+async function runScheduledNow() {
+  const url = document.getElementById('s-url').value.trim();
+  if (!url) { alert('Enter a target URL first.'); return; }
+  document.getElementById('r-url').value = url;
+  document.getElementById('r-scenario').value = document.getElementById('s-scenario').value;
+  switchTab('run');
+  await startRun();
+}
+async function loadSchedule() {
+  try {
+    const d = await fetch('/api/schedule').then(r => r.json());
+    if (d.mode && d.mode !== 'disabled') {
+      setSMode(d.mode);
+      if (d.interval_minutes) document.getElementById('s-interval').value = d.interval_minutes;
+      if (d.cron_expression)  document.getElementById('s-cron').value = d.cron_expression;
+      if (d.url) document.getElementById('s-url').value = d.url;
+      if (d.scenario) document.getElementById('s-scenario').value = d.scenario;
+      if (d.repo_path) document.getElementById('s-repo').value = d.repo_path;
+      document.getElementById('s-verify').checked = !!d.verify;
+      document.getElementById('s-pr').checked = !!d.publish_pr;
+      updateSchedBanner(d);
     }
+  } catch(_) {}
+}
+function updateSchedBanner(d) {
+  const bar = document.getElementById('sched-active');
+  bar.classList.remove('hidden');
+  const next = d.next_run ? new Date(d.next_run).toLocaleString() : '…';
+  document.getElementById('sched-next-txt').textContent = `Next run: ${next}`;
+}
 
-    btn.disabled = false;
-    btn.textContent = '💾 Save Settings';
-  }
+/* ════════════════════════════════════════════════
+   Queue
+   ════════════════════════════════════════════════ */
+function runFromQueue() {
+  const url = document.getElementById('r-url').value.trim();
+  if (!url) { alert('Enter a URL first.'); return; }
+  addItemToQueue();
+}
+async function addToQueue() {
+  const url = document.getElementById('r-url').value.trim();
+  if (!url) { alert('Enter a target URL first.'); return; }
+  await _addQItem({
+    url, scenario: document.getElementById('r-scenario').value.trim(),
+    repo_path: document.getElementById('r-repo').value.trim() || '.',
+    verify: document.getElementById('r-verify').checked,
+    publish_pr: document.getElementById('r-pr').checked,
+  });
+  switchTab('queue');
+}
+async function addItemToQueue() {
+  const url = document.getElementById('qa-url').value.trim();
+  if (!url) { alert('Enter a URL.'); return; }
+  await _addQItem({
+    url, scenario: document.getElementById('qa-scenario').value.trim(),
+    repo_path: '.', verify: document.getElementById('qa-verify').checked,
+    publish_pr: document.getElementById('qa-pr').checked,
+  });
+  document.getElementById('qa-url').value = '';
+}
+async function _addQItem(item) {
+  const r = await fetch('/api/queue', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(item) });
+  if (r.ok) loadQueue();
+}
+async function removeFromQueue(id) {
+  await fetch(`/api/queue/${id}`, { method:'DELETE' });
+  loadQueue();
+}
+async function clearQueue() {
+  const q = await fetch('/api/queue').then(r => r.json());
+  await Promise.all(q.queue.map(i => fetch(`/api/queue/${i.id}`, { method:'DELETE' })));
+  loadQueue();
+}
+async function runQueue() {
+  const btn = document.getElementById('runQueueBtn');
+  btn.disabled = true;
+  clearLog(); setStatus('running','Running queue…');
+  switchTab('run');
+  try {
+    const r = await fetch('/api/queue/run', { method:'POST' });
+    if (!r.ok) throw new Error((await r.json()).detail);
+    openSSE();
+  } catch(e) { appendLog('❌ ' + e.message,'bug'); setStatus('error','Error'); btn.disabled = false; }
+}
+async function loadQueue() {
+  try {
+    const d = await fetch('/api/queue').then(r => r.json());
+    const q = d.queue || [];
+    const badge = document.getElementById('q-badge');
+    badge.textContent = q.length ? ` (${q.length})` : '';
+    const list = document.getElementById('queueList');
+    if (!q.length) { list.innerHTML = '<div class="q-empty">No URLs in queue.</div>'; return; }
+    list.innerHTML = q.map((item, i) => `
+      <div class="q-item">
+        <div class="q-num">${i+1}</div>
+        <div class="q-info">
+          <div class="q-url">${escHtml(item.url)}</div>
+          <div class="q-meta">
+            ${item.verify ? '✓ verify' : ''} ${item.publish_pr ? '· PR' : ''}
+            ${item.scenario ? '· ' + escHtml(item.scenario.slice(0,60)) + '…' : ''}
+          </div>
+        </div>
+        <button class="q-del" onclick="removeFromQueue('${item.id}')" title="Remove">✕</button>
+      </div>`).join('');
+  } catch(_) {}
+}
 
-  /* ── Run pipeline ──────────────────────────────────────── */
-  async function startRun() {
-    const url = document.getElementById('targetUrl').value.trim();
-    if (!url) { alert('Please enter a target URL.'); return; }
+/* ════════════════════════════════════════════════
+   History
+   ════════════════════════════════════════════════ */
+async function loadHistory() {
+  try {
+    const d = await fetch('/api/history').then(r => r.json());
+    const h = d.history || [];
+    const list = document.getElementById('histList');
+    if (!h.length) { list.innerHTML = '<div class="h-empty">No runs yet.</div>'; return; }
+    list.innerHTML = h.map(r => {
+      const icon = r.error ? '💥' : r.bug_found ? (r.fixed ? '🔧' : '🐛') : '✅';
+      const sev  = (r.severity || 'none').toLowerCase();
+      const ts   = r.timestamp ? new Date(r.timestamp).toLocaleString() : '';
+      return `
+      <div class="h-item">
+        <div class="h-icon">${icon}</div>
+        <div class="h-body">
+          <div class="h-url">${escHtml(r.url)}</div>
+          <div class="h-sum">
+            <span class="sev sev-${sev}">${sev}</span>
+            ${r.summary ? ' · ' + escHtml(r.summary.slice(0,80)) : ''}
+            ${r.error   ? ' · <span style="color:var(--red)">' + escHtml(r.error.slice(0,60)) + '</span>' : ''}
+          </div>
+        </div>
+        <div class="h-meta">
+          <div class="h-ts">${ts}</div>
+          ${r.pr_url ? `<a class="h-pr" href="${r.pr_url}" target="_blank">View PR →</a>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(_) {}
+}
+async function clearHistory() {
+  if (!confirm('Clear all history?')) return;
+  await fetch('/api/history', { method:'DELETE' });
+  loadHistory();
+}
 
-    const payload = {
-      url,
-      scenario:    document.getElementById('scenario').value.trim(),
-      repo_path:   document.getElementById('repoPath').value.trim() || '.',
-      verify:      document.getElementById('toggleVerify').checked,
-      publish_pr:  document.getElementById('togglePR').checked,
-    };
+/* ════════════════════════════════════════════════
+   Notifications
+   ════════════════════════════════════════════════ */
+function checkNotifPerm() {
+  if (!('Notification' in window)) return;
+  notifAllowed = Notification.permission === 'granted';
+  const s = document.getElementById('notifStatus');
+  const b = document.getElementById('notifBtn');
+  if (notifAllowed) { s.textContent = '✓ Enabled'; b.textContent = 'Notifications On'; b.disabled = true; }
+  else if (Notification.permission === 'denied') { s.textContent = '✗ Blocked by browser'; }
+}
+async function requestNotifPerm() {
+  if (!('Notification' in window)) { alert('Browser notifications not supported.'); return; }
+  const perm = await Notification.requestPermission();
+  notifAllowed = perm === 'granted';
+  checkNotifPerm();
+}
 
-    // Reset UI
-    clearLog();
-    setStatus('running', 'Running…');
-    document.getElementById('runBtn').disabled = true;
-    document.getElementById('resultsSection').style.display = 'none';
-
-    try {
-      const res = await fetch('/api/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Unknown error');
-      }
-    } catch(e) {
-      appendLog('❌ Failed to start: ' + e.message, 'bug');
-      setStatus('error', 'Error');
-      document.getElementById('runBtn').disabled = false;
-      return;
-    }
-
-    // Open SSE stream
-    startSSE();
-  }
-
-  function startSSE() {
-    if (sseConn) sseConn.close();
-    sseConn = new EventSource('/api/run/stream');
-    sseConn.onmessage = e => {
-      const data = JSON.parse(e.data);
-      if (data.line) {
-        appendLog(data.line);
-      }
-      if (data.done) {
-        sseConn.close();
-        onRunDone(data.result);
-      }
-    };
-    sseConn.onerror = () => {
-      sseConn.close();
-      pollStatus(); // fallback to polling
-    };
-  }
-
-  function pollStatus() {
-    if (polling) clearInterval(polling);
-    polling = setInterval(async () => {
-      try {
-        const res  = await fetch('/api/run/status');
-        const data = await res.json();
-
-        // Sync new log lines
-        const body = document.getElementById('consoleBody');
-        const existing = body.querySelectorAll('.log-line').length;
-        data.log.slice(existing).forEach(l => appendLog(l));
-
-        if (data.status !== 'running') {
-          clearInterval(polling);
-          onRunDone(data.result);
-        }
-      } catch(e) { /* ignore transient fetch errors */ }
-    }, 800);
-  }
-
-  function onRunDone(result) {
-    document.getElementById('runBtn').disabled = false;
-
-    if (!result) { setStatus('error', 'Error'); return; }
-
-    if (result.error && !result.bug_found) {
-      setStatus('error', 'Error');
-    } else {
-      setStatus('done', 'Done');
-    }
-
-    showResults(result);
-  }
-
-  /* ── Results panel ─────────────────────────────────────── */
-  function showResults(r) {
-    document.getElementById('resultsSection').style.display = '';
-
-    const bugEl = document.getElementById('r-bug');
-    bugEl.textContent = r.bug_found ? '🐛 Yes' : '✅ No';
-    bugEl.className   = 'rc-value ' + (r.bug_found ? 'rc-red' : 'rc-green');
-
-    const sev = (r.severity || 'none').toLowerCase();
-    document.getElementById('r-sev').innerHTML =
-      `<span class="severity-badge sev-${sev}">${sev || '—'}</span>`;
-
-    const fixEl = document.getElementById('r-fix');
-    fixEl.textContent = r.fixed ? '✅ Yes' : (r.bug_found ? '❌ No' : '—');
-    fixEl.className   = 'rc-value ' + (r.fixed ? 'rc-green' : (r.bug_found ? 'rc-red' : 'rc-dim'));
-
-    const sumEl = document.getElementById('r-summary');
-    if (r.summary) {
-      sumEl.textContent = r.summary;
-      sumEl.style.display = '';
-    }
-
-    const prEl = document.getElementById('r-pr');
-    if (r.pr_url) {
-      prEl.href = r.pr_url;
-      prEl.textContent = '🔗 ' + r.pr_url;
-      prEl.style.display = 'flex';
-    }
-  }
-
-  /* ── Console helpers ───────────────────────────────────── */
-  function appendLog(line, cls) {
-    const body = document.getElementById('consoleBody');
-    const empty = body.querySelector('.log-empty');
-    if (empty) empty.remove();
-
-    if (!cls) {
-      if (line.includes('🐛') || line.includes('❌') || line.includes('💥')) cls = 'bug';
-      else if (line.includes('🔧') || line.includes('📬') || line.includes('⚠'))  cls = 'fix';
-      else if (line.includes('✅') || line.includes('🏁') || line.includes('🎉')) cls = 'ok';
-      else if (line.includes('🚀') || line.includes('🔍') || line.includes('ℹ'))  cls = 'info';
-    }
-
-    const span = document.createElement('div');
-    span.className = 'log-line' + (cls ? ' ' + cls : '');
-    span.textContent = line;
-    body.appendChild(span);
-    body.scrollTop = body.scrollHeight;
-  }
-
-  function clearLog() {
-    const body = document.getElementById('consoleBody');
-    body.innerHTML = '<span class="log-empty">Output will appear here when a run starts…</span>';
-  }
-
-  function copyLog() {
-    const lines = [...document.querySelectorAll('.log-line')].map(el => el.textContent).join('\n');
-    navigator.clipboard.writeText(lines).then(() => {
-      const btn = event.target;
-      btn.textContent = 'Copied!';
-      setTimeout(() => btn.textContent = 'Copy', 1500);
-    });
-  }
-
-  /* ── Status badge ──────────────────────────────────────── */
-  function setStatus(cls, text) {
-    const badge = document.getElementById('statusBadge');
-    badge.className = 'status-badge ' + cls;
-    document.getElementById('statusText').textContent = text;
-  }
+/* ════════════════════════════════════════════════
+   Util
+   ════════════════════════════════════════════════ */
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 </script>
 </body>
 </html>

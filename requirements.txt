@@ -36,6 +36,9 @@ fastapi>=0.111.0
 uvicorn[standard]>=0.30.0
 python-multipart>=0.0.9   # form data support
 
+# Scheduler (automated runs)
+apscheduler>=3.10.0
+
 # Observability / logging
 rich>=13.7.0            # pretty console output
 structlog>=24.2.0       # structured JSON logging
