@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment — NEVER commit this
+.venv/
+venv/
+env/
+ENV/
+
+# Environment secrets — NEVER commit this
+.env
+
+# Playwright / browser-use cache
+.playwright/
+playwright-report/
+screenshots/
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

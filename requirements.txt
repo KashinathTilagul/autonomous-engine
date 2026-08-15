@@ -1,0 +1,44 @@
+# ──────────────────────────────────────────────
+#  Autonomous UI Bug-Finding & Fix Engine
+#  requirements.txt
+# ──────────────────────────────────────────────
+
+# LLM / AI
+langchain-openai>=0.2.0
+langchain>=0.3.0
+langchain-core>=0.3.0
+
+# Amazon Bedrock support
+langchain-aws>=0.2.0
+boto3>=1.34.0
+
+# Headless browser automation (QA "Eyes")
+browser-use>=0.1.40
+
+# Configuration & environment
+python-dotenv>=1.0.0
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+
+# HTTP client (OpenHands REST calls)
+requests>=2.32.0
+httpx>=0.27.0          # async HTTP support
+
+# GitHub integration
+PyGithub>=2.3.0
+
+# Async utilities
+anyio>=4.4.0
+tenacity>=8.3.0         # retry logic for flaky network calls
+
+# Web UI server
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9   # form data support
+
+# Observability / logging
+rich>=13.7.0            # pretty console output
+structlog>=24.2.0       # structured JSON logging
+
+# Playwright (browser-use dependency – installs browsers)
+playwright>=1.44.0

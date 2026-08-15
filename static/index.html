@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Autonomous UI Bug Engine</title>
+  <meta name="description" content="AI-powered autonomous UI bug detection and auto-fix engine with headless browsing and OpenHands code repair." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Tokens ──────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0c0e14;
+      --bg-1:        #131620;
+      --bg-2:        #1a1e2e;
+      --bg-3:        #222840;
+      --border:      rgba(255,255,255,.07);
+      --border-hi:   rgba(99,179,237,.3);
+      --text:        #e2e8f0;
+      --text-dim:    #7a869a;
+      --text-muted:  #4a5568;
+      --accent:      #63b3ed;
+      --accent-glow: rgba(99,179,237,.15);
+      --green:       #48bb78;
+      --red:         #fc8181;
+      --yellow:      #f6e05e;
+      --radius:      10px;
+      --radius-lg:   16px;
+      --shadow:      0 4px 24px rgba(0,0,0,.4);
+      --transition:  all .18s cubic-bezier(.4,0,.2,1);
+    }
+
+    html, body { height: 100%; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────────── */
+    .app { display: flex; flex: 1; overflow: hidden; height: 100vh; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 340px;
+      min-width: 300px;
+      background: var(--bg-1);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, #63b3ed, #4299e1);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      box-shadow: 0 0 16px rgba(99,179,237,.3);
+    }
+    .logo h1 { font-size: 15px; font-weight: 700; letter-spacing: -.3px; }
+    .logo-sub { font-size: 11px; color: var(--text-dim); margin-left: 42px; }
+    .sidebar-scroll { flex: 1; overflow-y: auto; padding: 16px; }
+    .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+    .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
+
+    /* Main panel */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    .topbar {
+      padding: 16px 28px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      background: var(--bg-1);
+    }
+    .topbar h2 { font-size: 14px; font-weight: 600; color: var(--text-dim); }
+    .status-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      transition: var(--transition);
+    }
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .status-badge.running .status-dot { background: var(--accent); animation: pulse 1.2s infinite; }
+    .status-badge.done    .status-dot { background: var(--green); }
+    .status-badge.error   .status-dot { background: var(--red); }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+
+    .main-content { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+    /* ── Components ───────────────────────────────────────────────── */
+    .card {
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title .icon { font-size: 14px; }
+
+    /* Accordion sections in sidebar */
+    .section { margin-bottom: 4px; }
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--text-dim);
+      background: transparent;
+      border: none;
+      width: 100%;
+      text-align: left;
+      transition: var(--transition);
+    }
+    .section-header:hover { background: var(--bg-2); color: var(--text); }
+    .section-header .chevron { transition: transform .2s; font-size: 10px; }
+    .section-header.open .chevron { transform: rotate(180deg); }
+    .section-body { padding: 0 4px 8px; display: none; }
+    .section-body.open { display: block; }
+
+    /* Form elements */
+    .field { margin-bottom: 12px; }
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-dim);
+      margin-bottom: 5px;
+      letter-spacing: .03em;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 11px;
+      outline: none;
+      transition: var(--transition);
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .field input[type="password"] { font-family: 'JetBrains Mono', monospace; letter-spacing: .15em; }
+    .field select { appearance: none; cursor: pointer; }
+    .field textarea { resize: vertical; min-height: 80px; }
+    .field-hint { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+    /* Provider toggle */
+    .provider-toggle {
+      display: flex;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 3px;
+      gap: 3px;
+      margin-bottom: 14px;
+    }
+    .provider-btn {
+      flex: 1; padding: 7px 8px;
+      border-radius: 7px;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      text-align: center;
+    }
+    .provider-btn.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(99,179,237,.35);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 9px 18px;
+      border-radius: var(--radius);
+      border: none;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(99,179,237,.3);
+    }
+    .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+    .btn-ghost {
+      background: var(--bg-2);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { background: var(--bg-3); color: var(--text); }
+    .btn-danger {
+      background: rgba(252,129,129,.15);
+      color: var(--red);
+      border: 1px solid rgba(252,129,129,.2);
+    }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .btn-full { width: 100%; }
+
+    .sidebar-footer {
+      padding: 14px 16px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+
+    /* Run controls */
+    .run-grid { display: flex; flex-direction: column; gap: 14px; }
+    .input-row { display: flex; gap: 10px; }
+    .input-row .field { flex: 1; margin-bottom: 0; }
+    .run-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .toggle-group { display: flex; gap: 12px; }
+    .toggle-label {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 12px; color: var(--text-dim); cursor: pointer;
+    }
+    .toggle-label input[type=checkbox] {
+      width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer;
+    }
+
+    /* Log console */
+    .console {
+      background: #0a0c10;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .console-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-1);
+    }
+    .console-title {
+      font-size: 11px; font-weight: 600; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: .07em;
+      display: flex; align-items: center; gap: 7px;
+    }
+    .console-dots { display: flex; gap: 5px; }
+    .console-dots span {
+      width: 10px; height: 10px; border-radius: 50%;
+    }
+    .dot-r { background: #ff5f57; }
+    .dot-y { background: #febc2e; }
+    .dot-g { background: #28c840; }
+    .console-body {
+      height: 320px;
+      overflow-y: auto;
+      padding: 14px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    .console-body::-webkit-scrollbar { width: 4px; }
+    .console-body::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
+    .log-line { color: #a0aec0; }
+    .log-line.bug    { color: var(--red); }
+    .log-line.fix    { color: var(--yellow); }
+    .log-line.ok     { color: var(--green); }
+    .log-line.info   { color: var(--accent); }
+    .log-empty { color: var(--text-muted); font-style: italic; }
+
+    /* Result cards */
+    .result-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 16px; }
+    .result-card {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .result-card .rc-label { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; }
+    .result-card .rc-value { font-size: 20px; font-weight: 700; }
+    .rc-green { color: var(--green); }
+    .rc-red   { color: var(--red); }
+    .rc-dim   { color: var(--text-dim); }
+
+    .pr-link {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px;
+      background: var(--bg-2);
+      border: 1px solid var(--border-hi);
+      border-radius: var(--radius);
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--accent);
+      text-decoration: none;
+      word-break: break-all;
+    }
+    .pr-link:hover { background: var(--accent-glow); }
+
+    .severity-badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .sev-critical { background: rgba(252,129,129,.2); color: var(--red); }
+    .sev-high     { background: rgba(246,173,85,.2);  color: #f6ad55; }
+    .sev-medium   { background: rgba(246,224,94,.2);  color: var(--yellow); }
+    .sev-low      { background: rgba(99,179,237,.15); color: var(--accent); }
+    .sev-none     { background: rgba(72,187,120,.15); color: var(--green); }
+
+    /* Save feedback */
+    .save-msg {
+      font-size: 11px;
+      color: var(--green);
+      text-align: center;
+      opacity: 0;
+      transition: opacity .3s;
+      height: 16px;
+    }
+    .save-msg.show { opacity: 1; }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .app { flex-direction: column; height: auto; }
+      .sidebar { width: 100%; min-width: unset; border-right: none; border-bottom: 1px solid var(--border); }
+      .result-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 560px) {
+      .result-grid { grid-template-columns: 1fr; }
+      .topbar { padding: 12px 16px; }
+      .main-content { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ── Sidebar: Settings ────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">🤖</div>
+        <h1>Bug Engine</h1>
+      </div>
+      <div class="logo-sub">Autonomous UI Repair Pipeline</div>
+    </div>
+
+    <div class="sidebar-scroll" id="settingsForm">
+
+      <!-- LLM Provider -->
+      <div class="section">
+        <button class="section-header open" onclick="toggleSection(this)" id="sec-llm">
+          <span>⚡ LLM Provider</span><span class="chevron">▼</span>
+        </button>
+        <div class="section-body open">
+          <div class="provider-toggle">
+            <button class="provider-btn active" id="btn-openrouter" onclick="setProvider('openrouter')">OpenRouter</button>
+            <button class="provider-btn" id="btn-bedrock" onclick="setProvider('bedrock')">AWS Bedrock</button>
+          </div>
+
+          <!-- OpenRouter fields -->
+          <div id="openrouter-fields">
+            <div class="field">
+              <label>API Key</label>
+              <input type="password" id="OPENROUTER_API_KEY" placeholder="sk-or-v1-..." autocomplete="off" />
+              <div class="field-hint">From openrouter.ai/keys</div>
+            </div>
+            <div class="field">
+              <label>Model</label>
+              <select id="MODEL_NAME">
+                <option value="x-ai/grok-4">xAI Grok-4</option>
+                <option value="x-ai/grok-3">xAI Grok-3</option>
+                <option value="openai/gpt-4o">OpenAI GPT-4o</option>
+                <option value="openai/gpt-4o-mini">OpenAI GPT-4o mini</option>
+                <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
+                <option value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B</option>
+                <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Bedrock fields -->
+          <div id="bedrock-fields" style="display:none">
+            <div class="field">
+              <label>AWS Access Key ID</label>
+              <input type="password" id="AWS_ACCESS_KEY_ID" placeholder="AKIA..." autocomplete="off" />
+            </div>
+            <div class="field">
+              <label>AWS Secret Access Key</label>
+              <input type="password" id="AWS_SECRET_ACCESS_KEY" placeholder="secret..." autocomplete="off" />
+            </div>
+            <div class="field">
+              <label>AWS Region</label>
+              <select id="AWS_REGION">
+                <option value="us-east-1">us-east-1 (N. Virginia)</option>
+                <option value="us-west-2">us-west-2 (Oregon)</option>
+                <option value="eu-west-1">eu-west-1 (Ireland)</option>
+                <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Bedrock Model ID</label>
+              <select id="BEDROCK_MODEL_ID">
+                <option value="anthropic.claude-3-5-sonnet-20241022-v2:0">Claude 3.5 Sonnet v2</option>
+                <option value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku</option>
+                <option value="meta.llama3-3-70b-instruct-v1:0">Llama 3.3 70B</option>
+                <option value="amazon.nova-pro-v1:0">Amazon Nova Pro</option>
+                <option value="amazon.nova-lite-v1:0">Amazon Nova Lite</option>
+                <option value="mistral.mistral-large-2402-v1:0">Mistral Large</option>
+              </select>
+              <div class="field-hint">Note: Grok is available via xAI/OpenRouter, not Bedrock.</div>
+            </div>
+          </div>
+
+          <!-- Shared tuning -->
+          <div class="field">
+            <label>Temperature</label>
+            <input type="number" id="LLM_TEMPERATURE" value="0.0" min="0" max="2" step="0.1" />
+          </div>
+          <div class="field">
+            <label>Max Tokens</label>
+            <input type="number" id="LLM_MAX_TOKENS" value="4096" min="256" step="256" />
+          </div>
+        </div>
+      </div>
+
+      <!-- GitHub -->
+      <div class="section">
+        <button class="section-header" onclick="toggleSection(this)">
+          <span>🐙 GitHub</span><span class="chevron">▼</span>
+        </button>
+        <div class="section-body">
+          <div class="field">
+            <label>Personal Access Token</label>
+            <input type="password" id="GITHUB_TOKEN" placeholder="github_pat_..." autocomplete="off" />
+            <div class="field-hint">Needs: Contents (rw) + Pull Requests (rw)</div>
+          </div>
+          <div class="field">
+            <label>Repository (owner/repo)</label>
+            <input type="text" id="REPO_NAME" placeholder="KashinathTilagul/autonomous-engine" />
+          </div>
+          <div class="field">
+            <label>Base Branch</label>
+            <input type="text" id="GITHUB_BASE_BRANCH" value="main" />
+          </div>
+        </div>
+      </div>
+
+      <!-- OpenHands -->
+      <div class="section">
+        <button class="section-header" onclick="toggleSection(this)">
+          <span>🐳 OpenHands</span><span class="chevron">▼</span>
+        </button>
+        <div class="section-body">
+          <div class="field">
+            <label>API URL</label>
+            <input type="text" id="OPENHANDS_API_URL" value="http://localhost:3000" />
+            <div class="field-hint">Docker container REST endpoint</div>
+          </div>
+          <div class="field">
+            <label>API Key (optional)</label>
+            <input type="password" id="OPENHANDS_API_KEY" placeholder="leave blank if none" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label>Timeout (seconds)</label>
+            <input type="number" id="OPENHANDS_TIMEOUT_SECONDS" value="600" min="60" step="60" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Browser -->
+      <div class="section">
+        <button class="section-header" onclick="toggleSection(this)">
+          <span>🌐 Browser</span><span class="chevron">▼</span>
+        </button>
+        <div class="section-body">
+          <div class="field">
+            <label>Max Browser Steps</label>
+            <input type="number" id="BROWSER_MAX_STEPS" value="25" min="5" max="100" />
+          </div>
+          <div class="field">
+            <label>Log Level</label>
+            <select id="LOG_LEVEL">
+              <option value="INFO">INFO</option>
+              <option value="DEBUG">DEBUG</option>
+              <option value="WARNING">WARNING</option>
+              <option value="ERROR">ERROR</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /sidebar-scroll -->
+
+    <div class="sidebar-footer">
+      <div class="save-msg" id="saveMsg">✓ Settings saved securely to .env</div>
+      <button class="btn btn-primary btn-full" onclick="saveSettings()" id="saveBtn">
+        💾 Save Settings
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Main Panel ───────────────────────────────────────── -->
+  <main class="main">
+    <div class="topbar">
+      <h2>Pipeline Control</h2>
+      <div class="status-badge" id="statusBadge">
+        <span class="status-dot"></span>
+        <span id="statusText">Idle</span>
+      </div>
+    </div>
+
+    <div class="main-content">
+
+      <!-- Run Controls -->
+      <div class="card">
+        <div class="card-title"><span class="icon">🚀</span> New Run</div>
+        <div class="run-grid">
+          <div class="field" style="margin-bottom:0">
+            <label>Target URL</label>
+            <input type="url" id="targetUrl" placeholder="https://your-staging-site.com" />
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Test Scenario</label>
+            <textarea id="scenario" placeholder="Navigate the site as a new user and report any visual or functional bugs..." rows="3"></textarea>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Local Repo Path</label>
+            <input type="text" id="repoPath" value="." placeholder="/absolute/path/to/repo" />
+          </div>
+          <div class="run-actions">
+            <button class="btn btn-primary" id="runBtn" onclick="startRun()">
+              ▶ Run Pipeline
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="clearLog()">Clear Log</button>
+            <div class="toggle-group">
+              <label class="toggle-label">
+                <input type="checkbox" id="toggleVerify" checked />
+                Re-verify after fix
+              </label>
+              <label class="toggle-label">
+                <input type="checkbox" id="togglePR" />
+                Publish PR
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Console -->
+      <div class="console">
+        <div class="console-header">
+          <div class="console-dots">
+            <span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span>
+          </div>
+          <div class="console-title">📋 Live Output</div>
+          <button class="btn btn-ghost btn-sm" onclick="copyLog()">Copy</button>
+        </div>
+        <div class="console-body" id="consoleBody">
+          <span class="log-empty">Output will appear here when a run starts…</span>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div id="resultsSection" style="display:none">
+        <div class="card" style="margin-top:16px;margin-bottom:0">
+          <div class="card-title"><span class="icon">📊</span> Last Run Results</div>
+          <div class="result-grid">
+            <div class="result-card">
+              <div class="rc-label">Bug Found</div>
+              <div class="rc-value" id="r-bug">—</div>
+            </div>
+            <div class="result-card">
+              <div class="rc-label">Severity</div>
+              <div class="rc-value" id="r-sev">—</div>
+            </div>
+            <div class="result-card">
+              <div class="rc-label">Fix Applied</div>
+              <div class="rc-value" id="r-fix">—</div>
+            </div>
+          </div>
+          <div id="r-summary" style="margin-top:12px;font-size:13px;color:var(--text-dim);display:none"></div>
+          <a id="r-pr" class="pr-link" style="display:none" target="_blank">
+            🔗 View Pull Request
+          </a>
+        </div>
+      </div>
+
+    </div><!-- /main-content -->
+  </main>
+</div><!-- /app -->
+
+<script>
+  /* ── State ─────────────────────────────────────────────── */
+  let provider = 'openrouter';
+  let polling  = null;
+  let sseConn  = null;
+
+  /* ── Init ──────────────────────────────────────────────── */
+  document.addEventListener('DOMContentLoaded', loadSettings);
+
+  async function loadSettings() {
+    try {
+      const res  = await fetch('/api/settings');
+      const data = await res.json();
+
+      const fields = [
+        'OPENROUTER_API_KEY','MODEL_NAME','LLM_TEMPERATURE','LLM_MAX_TOKENS',
+        'OPENHANDS_API_URL','OPENHANDS_API_KEY','OPENHANDS_TIMEOUT_SECONDS',
+        'GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH',
+        'BROWSER_MAX_STEPS','LOG_LEVEL',
+        'AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_REGION','BEDROCK_MODEL_ID'
+      ];
+      fields.forEach(k => {
+        const el = document.getElementById(k);
+        if (el && data[k]) el.value = data[k];
+      });
+
+      // Set provider
+      const p = data.LLM_PROVIDER || 'openrouter';
+      setProvider(p);
+    } catch(e) {
+      console.warn('Could not load settings:', e);
+    }
+  }
+
+  /* ── Provider toggle ───────────────────────────────────── */
+  function setProvider(p) {
+    provider = p;
+    document.getElementById('btn-openrouter').classList.toggle('active', p === 'openrouter');
+    document.getElementById('btn-bedrock').classList.toggle('active', p === 'bedrock');
+    document.getElementById('openrouter-fields').style.display = p === 'openrouter' ? '' : 'none';
+    document.getElementById('bedrock-fields').style.display   = p === 'bedrock'    ? '' : 'none';
+  }
+
+  /* ── Section accordion ─────────────────────────────────── */
+  function toggleSection(btn) {
+    btn.classList.toggle('open');
+    const body = btn.nextElementSibling;
+    body.classList.toggle('open');
+  }
+
+  /* ── Save settings ─────────────────────────────────────── */
+  async function saveSettings() {
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    const payload = { LLM_PROVIDER: provider };
+    const fields = [
+      'OPENROUTER_API_KEY','MODEL_NAME','OPENROUTER_BASE_URL',
+      'LLM_TEMPERATURE','LLM_MAX_TOKENS',
+      'AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_REGION','BEDROCK_MODEL_ID',
+      'OPENHANDS_API_URL','OPENHANDS_API_KEY','OPENHANDS_TIMEOUT_SECONDS',
+      'GITHUB_TOKEN','REPO_NAME','GITHUB_BASE_BRANCH',
+      'BROWSER_MAX_STEPS','LOG_LEVEL'
+    ];
+    fields.forEach(k => {
+      const el = document.getElementById(k);
+      if (el) payload[k] = el.value;
+    });
+
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(await res.text());
+
+      const msg = document.getElementById('saveMsg');
+      msg.classList.add('show');
+      setTimeout(() => msg.classList.remove('show'), 3000);
+    } catch(e) {
+      alert('Save failed: ' + e.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = '💾 Save Settings';
+  }
+
+  /* ── Run pipeline ──────────────────────────────────────── */
+  async function startRun() {
+    const url = document.getElementById('targetUrl').value.trim();
+    if (!url) { alert('Please enter a target URL.'); return; }
+
+    const payload = {
+      url,
+      scenario:    document.getElementById('scenario').value.trim(),
+      repo_path:   document.getElementById('repoPath').value.trim() || '.',
+      verify:      document.getElementById('toggleVerify').checked,
+      publish_pr:  document.getElementById('togglePR').checked,
+    };
+
+    // Reset UI
+    clearLog();
+    setStatus('running', 'Running…');
+    document.getElementById('runBtn').disabled = true;
+    document.getElementById('resultsSection').style.display = 'none';
+
+    try {
+      const res = await fetch('/api/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Unknown error');
+      }
+    } catch(e) {
+      appendLog('❌ Failed to start: ' + e.message, 'bug');
+      setStatus('error', 'Error');
+      document.getElementById('runBtn').disabled = false;
+      return;
+    }
+
+    // Open SSE stream
+    startSSE();
+  }
+
+  function startSSE() {
+    if (sseConn) sseConn.close();
+    sseConn = new EventSource('/api/run/stream');
+    sseConn.onmessage = e => {
+      const data = JSON.parse(e.data);
+      if (data.line) {
+        appendLog(data.line);
+      }
+      if (data.done) {
+        sseConn.close();
+        onRunDone(data.result);
+      }
+    };
+    sseConn.onerror = () => {
+      sseConn.close();
+      pollStatus(); // fallback to polling
+    };
+  }
+
+  function pollStatus() {
+    if (polling) clearInterval(polling);
+    polling = setInterval(async () => {
+      try {
+        const res  = await fetch('/api/run/status');
+        const data = await res.json();
+
+        // Sync new log lines
+        const body = document.getElementById('consoleBody');
+        const existing = body.querySelectorAll('.log-line').length;
+        data.log.slice(existing).forEach(l => appendLog(l));
+
+        if (data.status !== 'running') {
+          clearInterval(polling);
+          onRunDone(data.result);
+        }
+      } catch(e) { /* ignore transient fetch errors */ }
+    }, 800);
+  }
+
+  function onRunDone(result) {
+    document.getElementById('runBtn').disabled = false;
+
+    if (!result) { setStatus('error', 'Error'); return; }
+
+    if (result.error && !result.bug_found) {
+      setStatus('error', 'Error');
+    } else {
+      setStatus('done', 'Done');
+    }
+
+    showResults(result);
+  }
+
+  /* ── Results panel ─────────────────────────────────────── */
+  function showResults(r) {
+    document.getElementById('resultsSection').style.display = '';
+
+    const bugEl = document.getElementById('r-bug');
+    bugEl.textContent = r.bug_found ? '🐛 Yes' : '✅ No';
+    bugEl.className   = 'rc-value ' + (r.bug_found ? 'rc-red' : 'rc-green');
+
+    const sev = (r.severity || 'none').toLowerCase();
+    document.getElementById('r-sev').innerHTML =
+      `<span class="severity-badge sev-${sev}">${sev || '—'}</span>`;
+
+    const fixEl = document.getElementById('r-fix');
+    fixEl.textContent = r.fixed ? '✅ Yes' : (r.bug_found ? '❌ No' : '—');
+    fixEl.className   = 'rc-value ' + (r.fixed ? 'rc-green' : (r.bug_found ? 'rc-red' : 'rc-dim'));
+
+    const sumEl = document.getElementById('r-summary');
+    if (r.summary) {
+      sumEl.textContent = r.summary;
+      sumEl.style.display = '';
+    }
+
+    const prEl = document.getElementById('r-pr');
+    if (r.pr_url) {
+      prEl.href = r.pr_url;
+      prEl.textContent = '🔗 ' + r.pr_url;
+      prEl.style.display = 'flex';
+    }
+  }
+
+  /* ── Console helpers ───────────────────────────────────── */
+  function appendLog(line, cls) {
+    const body = document.getElementById('consoleBody');
+    const empty = body.querySelector('.log-empty');
+    if (empty) empty.remove();
+
+    if (!cls) {
+      if (line.includes('🐛') || line.includes('❌') || line.includes('💥')) cls = 'bug';
+      else if (line.includes('🔧') || line.includes('📬') || line.includes('⚠'))  cls = 'fix';
+      else if (line.includes('✅') || line.includes('🏁') || line.includes('🎉')) cls = 'ok';
+      else if (line.includes('🚀') || line.includes('🔍') || line.includes('ℹ'))  cls = 'info';
+    }
+
+    const span = document.createElement('div');
+    span.className = 'log-line' + (cls ? ' ' + cls : '');
+    span.textContent = line;
+    body.appendChild(span);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function clearLog() {
+    const body = document.getElementById('consoleBody');
+    body.innerHTML = '<span class="log-empty">Output will appear here when a run starts…</span>';
+  }
+
+  function copyLog() {
+    const lines = [...document.querySelectorAll('.log-line')].map(el => el.textContent).join('\n');
+    navigator.clipboard.writeText(lines).then(() => {
+      const btn = event.target;
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+  }
+
+  /* ── Status badge ──────────────────────────────────────── */
+  function setStatus(cls, text) {
+    const badge = document.getElementById('statusBadge');
+    badge.className = 'status-badge ' + cls;
+    document.getElementById('statusText').textContent = text;
+  }
+</script>
+</body>
+</html>
